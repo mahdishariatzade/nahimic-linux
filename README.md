@@ -261,22 +261,45 @@ Arch: `cd packaging && makepkg -si`. Debian/Ubuntu: `./packaging/install-ubuntu.
 
 ## Uninstalling
 
+Stop the panel and the service first, so nothing is holding the Wine prefix:
+
 ```sh
-sudo pacman -R nahimic-linux        # Arch
+pkill -f '[a]pp/main.py'
+systemctl --user disable --now nahimic.service
+WINEPREFIX=~/.local/share/nahimic-linux/runtime/prefix wineserver -k   # optional, kills leftovers
 ```
+
+Arch removes the package with its dependencies:
+
+```sh
+sudo pacman -Rns nahimic-linux
+```
+
+Debian/Ubuntu has no package, so remove the installed tree:
 
 ```sh
 sudo rm -rf /usr/lib/nahimic-linux /usr/share/nahimic-linux /usr/bin/nahimic \
     /usr/lib/systemd/user/nahimic.service /usr/share/applications/nahimic.desktop \
     /usr/share/icons/hicolor/scalable/apps/nahimic.svg /etc/xdg/autostart/nahimic.desktop
-systemctl --user disable --now nahimic.service   # Debian/Ubuntu
+systemctl --user daemon-reload
+systemctl --user reset-failed nahimic.service 2>/dev/null || true
 ```
 
-This stops and disables the service. To also remove your settings and the Wine environment:
+Then remove your settings, the extracted spatial filter and the Wine environment, which holds the whole prefix including the seeded database:
 
 ```sh
 rm -rf ~/.local/share/nahimic-linux ~/.config/nahimic-linux
+rm -rf extra                             # in the repository, if you extracted one there
 ```
+
+Check that nothing is left:
+
+```sh
+systemctl --user status nahimic.service   # expected: Unit nahimic.service could not be found
+pgrep -af '[n]ahimic-linux/host'            # expected: no output
+```
+
+The packages that were installed for it stay behind, because other software may use them too. On Debian/Ubuntu they are `wine`, `mingw-w64`, `cabextract`, `python3-pyside6.qtcore`, `python3-pyside6.qtgui`, `python3-pyside6.qtwidgets` and `python3-pyside6.qtnetwork`; on Arch `wine`, `mingw-w64-gcc` and `cabextract`. Remove the ones you do not need with `apt remove` or `pacman -R`.
 
 ## Troubleshooting
 
