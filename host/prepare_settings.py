@@ -37,6 +37,9 @@ def prepare(source: Path, destination: Path):
         shutil.copytree(source / name, destination / name)
     # Preserve separate metadata for later handling of UseGlobalProfile and identity.
     shutil.copy2(source / "Metadata.nsx", destination / "Metadata.nsx")
+    generated = source / "Devices.auto.json"
+    if generated.is_file():
+        shutil.copy2(generated, destination / generated.name)
     if ET.tostring(ET.parse(destination / "Global.nsx").find("Settings")) != original_settings:
         raise ValueError("Global setting values changed during format translation")
     manifest = {

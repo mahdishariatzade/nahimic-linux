@@ -103,7 +103,10 @@ def activate():
 
 def serve():
     installation = DATA / "installation.json"
-    target = json.loads(installation.read_text())["target"] if installation.exists() else initialize()
+    # The session marker guards run_local, so a runtime directory that was
+    # removed underneath an existing installation is rebuilt instead of failing.
+    intact = installation.is_file() and (RUNTIME / ".nahimic-session").is_file()
+    target = json.loads(installation.read_text())["target"] if intact else initialize()
     session_path = RUNTIME / "session.json"
     if session_path.exists():
         session = json.loads(session_path.read_text())

@@ -12,6 +12,9 @@ def pulse(*args):
 
 def atomic_json(path, value):
     path = Path(path)
+    # The state directory is created at activation time, so a reset that removed
+    # it must not leave the service unable to write.
+    path.parent.mkdir(parents=True, exist_ok=True)
     pending = path.with_suffix(".pending")
     pending.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
     pending.replace(path)

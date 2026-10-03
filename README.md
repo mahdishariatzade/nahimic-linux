@@ -205,9 +205,27 @@ rm -rf ~/.local/share/nahimic-linux/runtime ~/.local/share/nahimic-linux/install
 nahimic --activate
 ```
 
+## Hardware support
+
+Most laptops need nothing: the installer opens every vendor cabinet in the Nahimic driver tool, copies the speaker tuning it finds and writes a matching table, so a laptop whose manufacturer ships tuning with the driver works out of the box. On a current driver tool that is over a thousand laptops.
+
+The curated table in `host/devices.json` only pins the hardware that has been tested. It wins over the generated one, because the generated entries can only match a subsystem identifier: a tuning cabinet records no codec. To have a laptop recognised with its codec, its real name and the verified flag, add an entry there:
+
+```json
+{
+  "name": "Laptop model (Realtek ALC287)",
+  "codec": "10ec0287",
+  "subsystem": "1462xxxx",
+  "device_file": "Devices/1462xxxx_InternalSpeakers.nsx",
+  "verified": false
+}
+```
+
+A laptop that matches nothing still works through `~/.config/nahimic-linux/devices.json`, which takes priority over both tables and needs no rebuild.
+
 ## Adding more hardware later
 
-Supported hardware lives in a plain JSON table that is read at startup, so adding a laptop needs no rebuild and no code changes. You need the codec and subsystem values from the hardware ID in Step 1, in lowercase.
+The tables are plain JSON read at startup, so nothing here needs a rebuild. You need the codec and subsystem values from the hardware ID in Step 1, in lowercase. An unlisted laptop that ships its own tuning is picked up by the generated table, so this is only needed when you want a codec, a real name or the verified flag.
 
 **For your own machines**, create `~/.config/nahimic-linux/devices.json`. Entries there are checked before the built-in table, and package updates never touch them:
 
@@ -228,7 +246,8 @@ Supported hardware lives in a plain JSON table that is read at startup, so addin
 Then run `nahimic --activate` so the service picks up the new speaker output. Notes:
 
 - `subsystem` can be `null` to match every laptop using that codec.
-- `device_file` is the speaker tuning. Point it at `Devices/1D05E022_Speakers.nsx` to borrow the existing tuning, or at the full path of your own `.nsx` file (see Step 6).
+- `device_file` is the speaker tuning. Point it at `Devices/1D05E022_Speakers.nsx` to borrow the existing tuning, at a file the generated table already produced under `/usr/share/nahimic-linux/factory/Devices/`, or at the full path of your own `.nsx` file (see Step 6).
+- `codec` may be left out to match the subsystem with any codec, which is what the generated entries do.
 - Leave `verified` as `false` unless you have tested that entry on the machine itself.
 
 **For everyone**, add the entry to [host/devices.json](host/devices.json) in the repository instead, then commit, push, and reinstall. Do not edit the installed copy under `/usr/lib/nahimic-linux/`, because a package update overwrites it.
