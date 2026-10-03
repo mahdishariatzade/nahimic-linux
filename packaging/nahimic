@@ -1,2 +1,6 @@
 #!/bin/sh
-exec /usr/bin/python /usr/lib/nahimic-linux/host/entry.py "$@"
+for interpreter in /usr/lib/nahimic-linux/venv/bin/python3 /usr/bin/python3 /usr/bin/python; do
+    [ -x "$interpreter" ] && exec "$interpreter" /usr/lib/nahimic-linux/host/entry.py "$@"
+done
+echo "nahimic: no Python 3 interpreter found" >&2
+exit 1

@@ -35,6 +35,17 @@ class DevicesTest(unittest.TestCase):
             self.assertEqual(entry['codec'], '10ec0256')
             self.assertFalse(entry['verified'])
 
+    def test_msi_alc274_speakers_on_intel_sof(self):
+        # MSI Stealth 14 Studio A13VF: Realtek ALC274 behind Intel SOF, subsystem 146213c0.
+        real = 'HDA:8086281f,80860101,00100000 HDA:10ec0274,146213c0,00100004 cfg-dmics:2'
+        entry = devices.match(sink(real), self.table)
+        self.assertEqual(entry['codec'], '10ec0274')
+        self.assertEqual(entry['device_file'], 'Devices/146213C0_InternalSpeakers.nsx')
+        # The HDMI endpoints of the same laptop share the subsystem and must not match.
+        self.assertIsNone(devices.match(sink('HDA:10de00a7,146213c0,00100100'), self.table))
+        self.assertIsNone(devices.match(sink('HDA:8086281f,80860101,00100000 HDA:10ec0274,146213c0,00100004',
+                                             '[Out] HDMI3'), self.table))
+
     def test_other_codecs_and_ports_are_rejected(self):
         self.assertIsNone(devices.match(sink('HDA:10ec0257,17aa3801,00100001'), self.table))
         self.assertIsNone(devices.match(sink('HDA:14f11f87,deadbeef,00100100'), self.table))
