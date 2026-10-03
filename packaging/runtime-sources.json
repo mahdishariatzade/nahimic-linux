@@ -1,0 +1,17 @@
+{
+  "_comment": "Runtime components downloaded at install time and verified against runtime-sha256.json before use. Keep in sync with packaging/PKGBUILD.",
+  "components": [
+    {
+      "name": "nahimic-apo4",
+      "file": "nahimic-apo4-4.14.cab",
+      "url": "https://catalog.s.download.windowsupdate.com/d/msdownload/update/driver/drvs/2025/06/5038101c-bafc-45b6-b338-d086f6877059_8ba41f8fd185d004f674891c937eb6b815acb443.cab",
+      "sha256": "f3b1aae44826f85045cff8e085367dd8b48ffb3510e074adf552cc8eafbf8bde"
+    },
+    {
+      "name": "nahimic-runtime-settings",
+      "file": "nahimic-runtime-settings.exe",
+      "url": "https://nahimic.helprace.com/resources/SdHjE1CwBkqCwL1qTng83XvmSgyUM3WU8bA3F21ZCfca-wMam1lcLqCrQgAIHtE1DyfpwdnFPjQ5DuRdOgpXLg~~/GenericNahimicRestoreTool.exe",
+      "sha256": "5f9c4d9eda54b7f946e331740354f01c043f25408d7053b4c23327c1b5b0a74a"
+    }
+  ]
+}

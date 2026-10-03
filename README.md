@@ -2,7 +2,7 @@
 
 Nahimic audio effects for laptop speakers on Linux. Includes Music, Movie, Gaming, and Communication profiles; bass, voice, and treble controls; surround sound; volume stabilization; and a ten-band equalizer. Switch between processed and original audio with one click. Volume stays in sync with the system, settings are saved automatically, and effects keep running after you close the panel.
 
-This fork adds support for the **Realtek ALC256** audio chip and uses English as the source language. It is based on [wearzdk/nahimic-linux](https://github.com/wearzdk/nahimic-linux).
+This fork adds support for the **Realtek ALC256** and **Realtek ALC274** audio chips, ships installers for **Arch Linux and Debian/Ubuntu**, and uses English as the source language. It is based on [wearzdk/nahimic-linux](https://github.com/wearzdk/nahimic-linux).
 
 This is an independent community project. It is not affiliated with, endorsed by, or sponsored by Nahimic, A-Volute, SteelSeries, or PC manufacturers. Names, trademarks, and original assets belong to their respective owners.
 
@@ -18,7 +18,7 @@ Follow these steps **in order**. Do not skip ahead. Every command is typed into 
 
 You need all of the following. If any are missing, this project will not work on your machine.
 
-- An **Arch Linux** based distribution (Arch, EndeavourOS, Manjaro, CachyOS, Garuda, and similar). The installer uses `pacman` and `makepkg`.
+- An **Arch Linux** based distribution (Arch, EndeavourOS, Manjaro, CachyOS, Garuda, and similar) or **Debian/Ubuntu** and derivatives. The Arch package uses `pacman` and `makepkg`; Debian/Ubuntu uses the bundled shell installer.
 - A 64-bit (x86_64) laptop.
 - **PipeWire** as your sound system (the default on current Arch-based systems).
 - A supported audio chip (you check this in Step 1).
@@ -48,7 +48,7 @@ This step only reads information. It does not change your system, and you do not
    | Check | What you need to see |
    |---|---|
    | Middle column (port) | `[Out] Speaker` or `analog-output-speaker` |
-   | Last column (hardware) | `HDA:10ec0256,1c05c022,` (Realtek ALC256) or `HDA:14f11f87,1d05e022,` (MECHREVO Wujie 14X Pro) |
+   | Last column (hardware) | `HDA:10ec0256,1c05c022,` (Realtek ALC256), `HDA:10ec0274,146213c0,` (MSI Stealth 14 Studio A13VF) or `HDA:14f11f87,1d05e022,` (MECHREVO Wujie 14X Pro) |
 
 5. Decide:
    - **Both checks match:** continue to Step 2.
@@ -58,7 +58,7 @@ This step only reads information. It does not change your system, and you do not
 
 Write down the middle value of the hardware ID (in the example above, `1c05c022`). This is your laptop's **subsystem ID**. You may need it in Step 6.
 
-### Step 2: Enable the multilib repository
+### Step 2: Enable the multilib repository (Arch only)
 
 Wine, which this project needs, is in Arch's `multilib` repository. Many systems have it enabled already.
 
@@ -84,26 +84,47 @@ Wine, which this project needs, is in Arch's `multilib` repository. Many systems
 
 ### Step 3: Install the build tools
 
+Arch:
+
 ```sh
 sudo pacman -S --needed base-devel git
 ```
 
-The remaining dependencies (Wine, PySide6, MinGW, and others) are installed automatically in Step 4.
+Debian/Ubuntu:
+
+```sh
+sudo apt-get update
+sudo apt-get install -y build-essential pkgconf libpulse-dev mingw-w64 cabextract git
+```
+
+The remaining dependencies (Wine, PySide6, and others) are installed automatically in Step 4.
 
 ### Step 4: Download, build, and install
 
 Keep the **built-in speakers selected** during this step. The installer sets up the audio service at the end, and it looks for the speakers at that moment.
 
+Arch:
+
 ```sh
 cd ~
-git clone https://github.com/KevinLKs/nahimic-linux.git
+git clone https://github.com/mahdishariatzade/nahimic-linux.git
 cd nahimic-linux/packaging
 makepkg -si
 ```
 
-- `makepkg` asks for your password and asks you to confirm the dependencies. Answer `Y`.
-- It downloads the Nahimic runtime files from Microsoft Update and the Nahimic support site, checks their SHA-256 hashes, builds the program, and installs it. This can take several minutes.
-- Do **not** run `makepkg` with `sudo`. It refuses to run as root.
+Debian/Ubuntu:
+
+```sh
+cd ~
+git clone https://github.com/mahdishariatzade/nahimic-linux.git
+cd nahimic-linux
+./packaging/install-ubuntu.sh
+```
+
+Both paths download the Nahimic runtime files from Microsoft Update and the Nahimic support site, check their SHA-256 hashes, build the program, install it under `/usr`, and enable the user service. This can take several minutes.
+
+- `makepkg` and the Debian/Ubuntu installer ask for your password. Answer `Y` when asked to confirm dependencies.
+- Do **not** run `makepkg` with `sudo`. It refuses to run as root. The Debian/Ubuntu installer uses `sudo` only for the individual steps that need it.
 
 If the end of the output says `Nahimic: open the application to see the setup error.`, the speakers were not detected. Go back to Step 1, fix the output selection, then continue to Step 5 anyway. Opening the app retries the setup.
 
@@ -123,7 +144,9 @@ If the end of the output says `Nahimic: open the application to see the setup er
 5. Toggle the power button at the top of the app. You should hear the difference between processed and original sound.
 6. Log out and back in (or reboot) and confirm the effects start again on their own.
 
-On a Realtek ALC256 laptop, the ALC256 support is **experimental**. It borrows the speaker tuning from a different laptop, so the sound may be brighter, bassier, or louder than expected. Start with a low bass setting. Step 6 explains how to use tuning made for your own laptop.
+On the Realtek ALC256 laptop, the ALC256 support is **experimental**: it borrows the speaker tuning from a different laptop. Start with a low bass setting.
+
+The MSI Stealth 14 Studio A13VF entry (Realtek ALC274, Intel SOF, subsystem `146213c0`) uses the tuning file that MSI ships for that machine, so it starts from the correct speaker correction. It is still marked `verified: false` until the entry has been tested on the hardware. Step 6 explains how to use tuning made for your own laptop.
 
 ### Step 6 (optional): Use your laptop's own speaker tuning
 
@@ -192,27 +215,39 @@ Then run `nahimic --activate` so the service picks up the new speaker output. No
 
 **Another Arch-based distribution** (Arch, EndeavourOS, Manjaro, Garuda, and similar): nothing changes. Use the same steps in the setup guide. Your settings in `~/.local/share/nahimic-linux/` and `~/.config/nahimic-linux/` carry over if you keep your home folder. Distributions that update packages more slowly may ship an older Wine or PySide6, which is the first thing to check if it works on one system but not another.
 
-**A distribution that is not Arch-based** (Fedora, Ubuntu, openSUSE, NixOS): there is no installer. The `packaging/` folder uses `pacman` and `makepkg`. Everything else is portable, so a manual install is possible but not quick:
+**Debian, Ubuntu and derivatives:** use the bundled installer, which installs the Debian package set, fetches and verifies the runtime files, builds, installs and enables the service:
+
+```sh
+./packaging/install-ubuntu.sh
+```
+
+**Another distribution** (Fedora, openSUSE, NixOS): everything is portable, so a manual install is possible:
 
 1. Install the equivalents of the dependencies listed in [packaging/PKGBUILD](packaging/PKGBUILD): Wine, PySide6, PipeWire, PipeWire Pulse, WirePlumber 0.5+, libpulse, systemd, plus MinGW-w64 GCC and cabextract for the build.
-2. Download the two runtime files listed in the `source` array of the PKGBUILD by hand.
-3. Run `python packaging/extract_runtime.py <cab> <exe> runtime` to unpack and hash-verify them, then copy `runtime/vendor` and `runtime/factory` to `/usr/share/nahimic-linux/`.
-4. Run `make` and `sudo make install`.
-5. Run `nahimic --activate`.
+2. Run `python3 packaging/fetch_runtime.py --output build/runtime` to download, unpack and hash-verify the runtime files.
+3. Run `make` and `sudo make install`, then copy `build/runtime/vendor` and `build/runtime/factory` to `/usr/share/nahimic-linux/`.
+4. Run `nahimic --activate`.
 
 ## Updating
 
 ```sh
 cd ~/nahimic-linux
 git pull
-cd packaging
-makepkg -si
 ```
+
+Arch: `cd packaging && makepkg -si`. Debian/Ubuntu: `./packaging/install-ubuntu.sh`.
 
 ## Uninstalling
 
 ```sh
-sudo pacman -R nahimic-linux
+sudo pacman -R nahimic-linux        # Arch
+```
+
+```sh
+sudo rm -rf /usr/lib/nahimic-linux /usr/share/nahimic-linux /usr/bin/nahimic \
+    /usr/lib/systemd/user/nahimic.service /usr/share/applications/nahimic.desktop \
+    /usr/share/icons/hicolor/scalable/apps/nahimic.svg /etc/xdg/autostart/nahimic.desktop
+systemctl --user disable --now nahimic.service   # Debian/Ubuntu
 ```
 
 This stops and disables the service. To also remove your settings and the Wine environment:

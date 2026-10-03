@@ -208,7 +208,9 @@ static bool configure_original(const wchar_t* apo_path,const wchar_t* root,const
         std::fprintf(stderr,"Configuration requires a dedicated Nahimic Wine prefix.\n");return false;
     }
     bool ready=false;if(!product_ready(ready))return false;
-    if(root && ready){std::fprintf(stderr,"Product is already initialized; use --use-existing-settings\n");return false;}
+    // The service re-imports the original settings on every start, so an
+    // already initialized prefix is expected and must not block the import.
+    if(root && ready){std::fprintf(stderr,"Re-initializing the existing product\n");}
     if(!root && !ready){std::fprintf(stderr,"Cannot reopen an uninitialized product\n");return false;}
     std::wstring path=apo_path;
     auto separator=path.find_last_of(L"\\/");

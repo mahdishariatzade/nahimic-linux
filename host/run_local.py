@@ -15,6 +15,18 @@ from prepare_settings import prepare
 
 def wine_path(path):
     return 'Z:' + str(path).replace('/', '\\')
+
+def wine_tool(name):
+    """Locate a Wine tool. Distributions disagree on where wineserver lives."""
+    candidates = (name, '/usr/lib/x86_64-linux-gnu/wine/' + name, '/usr/lib/wine/' + name)
+    for candidate in candidates:
+        if os.path.sep in candidate:
+            if os.access(candidate, os.X_OK):
+                return candidate
+        elif shutil.which(candidate):
+            return shutil.which(candidate)
+    return None
+
 import devices
 from desktop_audio import DesktopAudio, OutputUnavailable, supported_speaker
 
@@ -183,6 +195,9 @@ def main():
             with (work / 'prefix-init.log').open('wb') as log:
                 subprocess.run(['wineboot', '--init'], env=env, stdout=log, stderr=log, timeout=90, check=True)
         volume_path = work / 'native-volume.state'
+        # A previous crash leaves the shared state file behind and pulse_state
+        # refuses to reuse it, which would fail every later start.
+        volume_path.unlink(missing_ok=True)
         volume = start('volume', [str(state_reader), args.target, str(volume_path)], stdout=subprocess.DEVNULL)
         deadline = time.monotonic() + 10
         while 'volume_state_ready' not in (work / 'volume.log').read_text(errors='replace'):
@@ -288,8 +303,16 @@ def main():
         for file in files:
             file.close()
         if args.state_dir:
-            subprocess.run(['wineserver', '-k'], env=env, check=True, timeout=10)
-            subprocess.run(['wineserver', '-w'], env=env, check=True, timeout=10)
+            server = wine_tool('wineserver')
+            if server is None:
+                print('wineserver was not found; the Wine environment may still be running', flush=True)
+            else:
+                for flag in ('-k', '-w'):
+                    # Best effort: cleanup must not replace the original failure.
+                    try:
+                        subprocess.run([server, flag], env=env, timeout=30)
+                    except (OSError, subprocess.SubprocessError) as error:
+                        print(f'wineserver {flag} failed: {error}', flush=True)
         state.update(ready=False, stopped=True, clean_shutdown=success, exit_codes={name: child.returncode for name, child in children.items()})
         save()
         print(f'Stopped; evidence: {state_path}', flush=True)

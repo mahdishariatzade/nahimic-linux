@@ -15,6 +15,13 @@
       "subsystem": "1c05c022",
       "device_file": "Devices/1D05E022_Speakers.nsx",
       "verified": false
+    },
+    {
+      "name": "MSI Stealth 14 Studio A13VF (Realtek ALC274, Intel SOF)",
+      "codec": "10ec0274",
+      "subsystem": "146213c0",
+      "device_file": "Devices/146213C0_InternalSpeakers.nsx",
+      "verified": false
     }
   ]
 }

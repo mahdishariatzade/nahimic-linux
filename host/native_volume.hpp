@@ -40,13 +40,30 @@ public:
         if(!apo_volume_snapshot(mapped_, &state))return fail("incoherent state snapshot");
         FILETIME now;GetSystemTimeAsFileTime(&now);
         uint64_t ticks=(uint64_t(now.dwHighDateTime)<<32)|now.dwLowDateTime;
+        // The writer stamps with clock_gettime, this side reads the Wine clock,
+        // so a fresh snapshot can legitimately be a fraction of a millisecond
+        // ahead of the reading clock.
+        static constexpr uint64_t future_tolerance_100ns=1000000ULL;
+        static constexpr uint64_t stale_limit_100ns=20000000ULL;
+        uint64_t age=ticks>state.timestamp_100ns ? ticks-state.timestamp_100ns : 0;
         if(state.magic!=APO_VOLUME_MAGIC || !state.valid || state.channels!=2 || state.muted>1 ||
            state.target[255]!=0 || target_!=state.target ||
-           ticks<state.timestamp_100ns || ticks-state.timestamp_100ns>20000000ULL ||
+           ticks+future_tolerance_100ns<state.timestamp_100ns || age>stale_limit_100ns ||
            std::isnan(state.master_db) || state.master_db==INFINITY ||
            std::isnan(state.channel_db[0]) || state.channel_db[0]==INFINITY ||
-           std::isnan(state.channel_db[1]) || state.channel_db[1]==INFINITY)
+           std::isnan(state.channel_db[1]) || state.channel_db[1]==INFINITY){
+            // Name the rejected field so a failing machine can be diagnosed.
+            double age_ms = ticks>=state.timestamp_100ns
+                ? (double)(ticks-state.timestamp_100ns)/10000.0
+                : -(double)(state.timestamp_100ns-ticks)/10000.0;
+            std::fprintf(stderr,
+                         "native_volume_state magic=%08x valid=%u channels=%u muted=%u target_ok=%d "
+                         "age_ms=%.1f db=%.9g left=%.9g right=%.9g\n",
+                         state.magic, state.valid, state.channels, state.muted,
+                         target_==state.target && state.target[255]==0, age_ms,
+                         (double)state.master_db, (double)state.channel_db[0], (double)state.channel_db[1]);
             return fail("invalid, stale, or mismatched native endpoint state");
+        }
         if(!previous_.valid || state.muted!=previous_.muted || state.master_db!=previous_.master_db ||
            state.channel_db[0]!=previous_.channel_db[0] || state.channel_db[1]!=previous_.channel_db[1]){
             std::fprintf(stderr,"native_volume mute=%u db=%.9g left=%.9g right=%.9g\n",
