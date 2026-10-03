@@ -117,7 +117,9 @@ def main():
     target = matches[0]
     if not supported_speaker(target):
         raise RuntimeError('The target is not a supported speaker endpoint (see devices.json)')
-    hardware = devices.match(target)
+    hardware = devices.match(target, generated=original / devices.GENERATED)
+    if hardware is None and (original / devices.GENERATED).is_file():
+        hardware = devices.match(target)
     if not hardware.get('verified'):
         print('Warning: unverified hardware profile in use:', hardware['name'], flush=True)
     dll_sha256 = hashlib.sha256(dll.read_bytes()).hexdigest()

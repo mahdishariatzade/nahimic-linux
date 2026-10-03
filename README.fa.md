@@ -121,6 +121,56 @@ rm -rf ~/.local/share/nahimic-linux/runtime ~/.local/share/nahimic-linux/install
 nahimic --activate
 ```
 
+## حذف کامل
+
+اول پنل و سرویس را متوقف کنید تا چیزی prefix واین را در اختیار نداشته باشد:
+
+```sh
+pkill -f '[a]pp/main.py'
+systemctl --user disable --now nahimic.service
+WINEPREFIX=~/.local/share/nahimic-linux/runtime/prefix wineserver -k   # اختیاری، برای باقی‌مانده‌ها
+```
+
+آرچ با پکیج و وابستگی‌هایش حذف می‌شود:
+
+```sh
+sudo pacman -Rns nahimic-linux
+```
+
+دبیان/اوبونتو پکیج ندارد، پس درخت نصب‌شده را پاک کنید:
+
+```sh
+sudo rm -rf /usr/lib/nahimic-linux /usr/share/nahimic-linux /usr/bin/nahimic \
+    /usr/lib/systemd/user/nahimic.service /usr/share/applications/nahimic.desktop \
+    /usr/share/icons/hicolor/scalable/apps/nahimic.svg /etc/xdg/autostart/nahimic.desktop
+systemctl --user daemon-reload
+systemctl --user reset-failed nahimic.service 2>/dev/null || true
+```
+
+بعد تنظیمات، فیلتر فضایی استخراج‌شده و محیط واین را حذف کنید — کل prefix از جمله دیتابیس تزریق‌شده داخل آن است:
+
+```sh
+rm -rf ~/.local/share/nahimic-linux ~/.config/nahimic-linux
+rm -rf extra                             # داخل مخزن، اگر آنجا استخراج کرده‌اید
+```
+
+بررسی نهایی:
+
+```sh
+systemctl --user status nahimic.service   # انتظار: Unit nahimic.service could not be found
+pgrep -af '[n]ahimic-linux/host'            # انتظار: بدون خروجی
+```
+
+پکیج‌هایی که برای آن نصب شدند باقی می‌مانند، چون ممکن است نرم‌افزار دیگری هم ازشان استفاده کند. در دبیان/اوبونتو: `wine`، `mingw-w64`، `cabextract`، `python3-pyside6.qtcore`، `python3-pyside6.qtgui`، `python3-pyside6.qtwidgets` و `python3-pyside6.qtnetwork`. در آرچ: `wine`، `mingw-w64-gcc` و `cabextract`. هرکدام را که لازم ندارید با `apt remove` یا `pacman -R` حذف کنید.
+
+## پشتیبانی سخت‌افزار
+
+بیشتر لپتاپ‌ها هیچ کاری لازم ندارند: نصب‌کننده همه‌ی کاب‌های سازنده‌ها را در بسته‌ی درایور ناهیمیک باز می‌کند، تیونینگ اسپیکرشان را برمی‌دارد و جدول تطبیق می‌سازد. با بسته‌ی فعلی بیش از هزار لپتاپ بدون هیچ تنظیمی کار می‌کنند.
+
+جدول curated در `host/devices.json` فقط سخت‌افزار تست‌شده را نگه می‌دارد و بر جدول تولیدشده مقدم است، چون ورودی‌های تولیدشده فقط subsystem دارند و کدک را در خود فایل تیونینگ ثبت نمی‌کنند. برای اینکه یک لپتاپ با کدک و نام واقعی و پرچم verified شناسایی شود، ورودی‌اش را آنجا اضافه کنید.
+
+اگر لپتاپی در هیچ جدولی نبود ولی خودش تیونینگ دارد، از طریق `~/.config/nahimic-linux/devices.json` کار می‌کند و نیازی به بیلد مجدد ندارد.
+
 ## سخت‌افزار پشتیبانی‌شده
 
 | مدل | کدک | subsystem | وضعیت |

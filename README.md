@@ -205,9 +205,27 @@ rm -rf ~/.local/share/nahimic-linux/runtime ~/.local/share/nahimic-linux/install
 nahimic --activate
 ```
 
+## Hardware support
+
+Most laptops need nothing: the installer opens every vendor cabinet in the Nahimic driver tool, copies the speaker tuning it finds and writes a matching table, so a laptop whose manufacturer ships tuning with the driver works out of the box. On a current driver tool that is over a thousand laptops.
+
+The curated table in `host/devices.json` only pins the hardware that has been tested. It wins over the generated one, because the generated entries can only match a subsystem identifier: a tuning cabinet records no codec. To have a laptop recognised with its codec, its real name and the verified flag, add an entry there:
+
+```json
+{
+  "name": "Laptop model (Realtek ALC287)",
+  "codec": "10ec0287",
+  "subsystem": "1462xxxx",
+  "device_file": "Devices/1462xxxx_InternalSpeakers.nsx",
+  "verified": false
+}
+```
+
+A laptop that matches nothing still works through `~/.config/nahimic-linux/devices.json`, which takes priority over both tables and needs no rebuild.
+
 ## Adding more hardware later
 
-Supported hardware lives in a plain JSON table that is read at startup, so adding a laptop needs no rebuild and no code changes. You need the codec and subsystem values from the hardware ID in Step 1, in lowercase.
+The tables are plain JSON read at startup, so nothing here needs a rebuild. You need the codec and subsystem values from the hardware ID in Step 1, in lowercase. An unlisted laptop that ships its own tuning is picked up by the generated table, so this is only needed when you want a codec, a real name or the verified flag.
 
 **For your own machines**, create `~/.config/nahimic-linux/devices.json`. Entries there are checked before the built-in table, and package updates never touch them:
 
@@ -228,7 +246,8 @@ Supported hardware lives in a plain JSON table that is read at startup, so addin
 Then run `nahimic --activate` so the service picks up the new speaker output. Notes:
 
 - `subsystem` can be `null` to match every laptop using that codec.
-- `device_file` is the speaker tuning. Point it at `Devices/1D05E022_Speakers.nsx` to borrow the existing tuning, or at the full path of your own `.nsx` file (see Step 6).
+- `device_file` is the speaker tuning. Point it at `Devices/1D05E022_Speakers.nsx` to borrow the existing tuning, at a file the generated table already produced under `/usr/share/nahimic-linux/factory/Devices/`, or at the full path of your own `.nsx` file (see Step 6).
+- `codec` may be left out to match the subsystem with any codec, which is what the generated entries do.
 - Leave `verified` as `false` unless you have tested that entry on the machine itself.
 
 **For everyone**, add the entry to [host/devices.json](host/devices.json) in the repository instead, then commit, push, and reinstall. Do not edit the installed copy under `/usr/lib/nahimic-linux/`, because a package update overwrites it.
@@ -261,22 +280,45 @@ Arch: `cd packaging && makepkg -si`. Debian/Ubuntu: `./packaging/install-ubuntu.
 
 ## Uninstalling
 
+Stop the panel and the service first, so nothing is holding the Wine prefix:
+
 ```sh
-sudo pacman -R nahimic-linux        # Arch
+pkill -f '[a]pp/main.py'
+systemctl --user disable --now nahimic.service
+WINEPREFIX=~/.local/share/nahimic-linux/runtime/prefix wineserver -k   # optional, kills leftovers
 ```
+
+Arch removes the package with its dependencies:
+
+```sh
+sudo pacman -Rns nahimic-linux
+```
+
+Debian/Ubuntu has no package, so remove the installed tree:
 
 ```sh
 sudo rm -rf /usr/lib/nahimic-linux /usr/share/nahimic-linux /usr/bin/nahimic \
     /usr/lib/systemd/user/nahimic.service /usr/share/applications/nahimic.desktop \
     /usr/share/icons/hicolor/scalable/apps/nahimic.svg /etc/xdg/autostart/nahimic.desktop
-systemctl --user disable --now nahimic.service   # Debian/Ubuntu
+systemctl --user daemon-reload
+systemctl --user reset-failed nahimic.service 2>/dev/null || true
 ```
 
-This stops and disables the service. To also remove your settings and the Wine environment:
+Then remove your settings, the extracted spatial filter and the Wine environment, which holds the whole prefix including the seeded database:
 
 ```sh
 rm -rf ~/.local/share/nahimic-linux ~/.config/nahimic-linux
+rm -rf extra                             # in the repository, if you extracted one there
 ```
+
+Check that nothing is left:
+
+```sh
+systemctl --user status nahimic.service   # expected: Unit nahimic.service could not be found
+pgrep -af '[n]ahimic-linux/host'            # expected: no output
+```
+
+The packages that were installed for it stay behind, because other software may use them too. On Debian/Ubuntu they are `wine`, `mingw-w64`, `cabextract`, `python3-pyside6.qtcore`, `python3-pyside6.qtgui`, `python3-pyside6.qtwidgets` and `python3-pyside6.qtnetwork`; on Arch `wine`, `mingw-w64-gcc` and `cabextract`. Remove the ones you do not need with `apt remove` or `pacman -R`.
 
 ## Troubleshooting
 
@@ -287,6 +329,7 @@ rm -rf ~/.local/share/nahimic-linux ~/.config/nahimic-linux
 | "The audio service is not running" | Run `systemctl --user restart nahimic.service`, then reopen the app. |
 | Effects stop when headphones are plugged in | Expected. Effects only apply to the built-in speakers and resume when you unplug. |
 | `unverified hardware profile in use` in the log | Expected on Realtek ALC256. It is a reminder that the tuning is borrowed. |
+| "Effect playback is linked to ... instead of the built-in speakers" | Another application owns the system output, EasyEffects being the usual one. Quit it, then `systemctl --user restart nahimic.service`. Only one effect chain can process the speakers at a time. |
 
 Useful commands:
 
