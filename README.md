@@ -183,6 +183,28 @@ Only do this if your laptop originally shipped with Nahimic on Windows and you c
 
 ---
 
+## Optional: the Nahimic spatial filter
+
+Virtual surround and the headphone spatialisation of Nahimic are driven by a filter database that the Windows application hands to the driver at runtime, so it is not part of the driver package. Without it the service still works and every other effect applies; the spatial filter simply stays at whatever the driver package provides.
+
+If you have a Windows installation that runs Nahimic, read the database back and seed it into the Wine prefix:
+
+```sh
+python3 packaging/nahimic-settings.py extract --windows /mnt/win11
+python3 packaging/nahimic-settings.py seed
+systemctl --user restart nahimic.service
+```
+
+The first command needs `reged` from the `chntpw` package and writes `extra/3d-database.bin` plus the full settings dump for reference. Nothing proprietary is stored in this repository, so `extra/` is ignored by git. The installers run the seeding step automatically when `extra/3d-database.bin` is present.
+
+Seeding only works while the prefix is consistent. If the service reports `Original APO initialization failed`, a rejected import has left the product half initialized; reset it and start over:
+
+```sh
+systemctl --user stop nahimic.service
+rm -rf ~/.local/share/nahimic-linux/runtime ~/.local/share/nahimic-linux/installation.json
+nahimic --activate
+```
+
 ## Adding more hardware later
 
 Supported hardware lives in a plain JSON table that is read at startup, so adding a laptop needs no rebuild and no code changes. You need the codec and subsystem values from the hardware ID in Step 1, in lowercase.

@@ -66,6 +66,28 @@ journalctl --user -u nahimic.service -b
 
 `active` فقط وقتی true است که صدایی واقعاً در حال پخش باشد.
 
+## اختیاری: فیلتر فضایی ناهیمیک
+
+Virtual Surround و صدای فضایی هدفون ناهیمیک با یک دیتابیس فیلتر کار می‌کنند که اپ ویندوز در زمان اجرا به درایور می‌دهد، پس داخل بسته‌ی درایور نیست. بدون آن سرویس کار می‌کند و همه‌ی افکت‌ها اعمال می‌شوند؛ فقط فیلتر فضایی همان چیزی می‌ماند که بسته‌ی درایور دارد.
+
+اگر یک نصب ویندوز داری که رویش ناهیمیک نصب است:
+
+```sh
+python3 packaging/nahimic-settings.py extract --windows /mnt/win11
+python3 packaging/nahimic-settings.py seed
+systemctl --user restart nahimic.service
+```
+
+دستور اول به `reged` از پکیج `chntpw` نیاز دارد و `extra/3d-database.bin` را همراه با یک dump کامل از تنظیمات می‌نویسد. هیچ داده‌ی اختصاصی‌ای در این مخزن ذخیره نمی‌شود، به همین دلیل `extra/` در git نادیده گرفته می‌شود. اسکریپت‌های نصب، اگر `extra/3d-database.bin` موجود باشد، خودکار این مرحله را اجرا می‌کنند.
+
+اگر بعد از تزریق، سرویس خطای `Original APO initialization failed` داد، یعنی یک import ناموفق محصول را نیمه‌initialized رها کرده؛ ریست کنید:
+
+```sh
+systemctl --user stop nahimic.service
+rm -rf ~/.local/share/nahimic-linux/runtime ~/.local/share/nahimic-linux/installation.json
+nahimic --activate
+```
+
 ## افزودن لپتاپ خودتان
 
 جدول سخت‌افزار یک JSON ساده است و هنگام اجرا خوانده می‌شود؛ برای لپتاپ خودتان نیازی به بیلد مجدد نیست. فایل `~/.config/nahimic-linux/devices.json` بسازید (بر بیلد اصلی ارجاع دارد و با آپدیت پاک نمی‌شود):

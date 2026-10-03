@@ -44,6 +44,23 @@ install_tree() {
     sudo cp -r "$RUNTIME/vendor" "$RUNTIME/factory" "$SHARE/"
 }
 
+seed_spatial_filter() {
+    # Optional: the virtual surround needs a spatial filter database that the
+    # Windows application hands to the driver at runtime, so it is not part of
+    # the driver package. Skip this when no extracted data is present.
+    local extra="$ROOT/extra"
+    if [ ! -f "$extra/3d-database.bin" ]; then
+        log "No spatial filter database found, skipping the optional seeding step"
+        echo "  Extract one from a Windows installation with:"
+        echo "    python3 $PACKAGING/nahimic-settings.py extract --windows /mnt/win11"
+        return 0
+    fi
+    log "Seeding the Nahimic spatial filter into the Wine prefix"
+    systemctl --user stop nahimic.service >/dev/null 2>&1 || true
+    python3 "$PACKAGING/nahimic-settings.py" seed --extra "$extra" ||
+        echo "nahimic: the spatial filter was not seeded; the service keeps working without it"
+}
+
 activate_sessions() {
     log "Enabling the user service and activating running sessions"
     systemctl --user daemon-reload || true

@@ -1,7 +1,8 @@
-__pycache__/
-*.pyc
 /bin/
-/runtime/
-*.pkg.tar.*
-dist/
 build/
+dist/
+extra/
+*.pkg.tar.*
+*.pyc
+__pycache__/
+/runtime/

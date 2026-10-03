@@ -55,6 +55,7 @@ install_dependencies
 fetch_runtime
 build_host
 install_tree
+seed_spatial_filter
 verify_runtime
 activate_sessions
 

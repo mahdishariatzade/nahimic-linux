@@ -1,15 +1,18 @@
 PREFIX ?= /usr
 DESTDIR ?=
 CXX_WIN = x86_64-w64-mingw32-g++
+CC_WIN = x86_64-w64-mingw32-gcc
 WINFLAGS = -std=c++17 -Wall -Wextra -Werror -O2 -static -municode
 
-all: bin/apo_probe.exe bin/apo_control.exe bin/pulse_state
+all: bin/apo_probe.exe bin/apo_control.exe bin/seed3d.exe bin/pulse_state
 bin:
 	mkdir -p bin
 bin/apo_probe.exe: host/apo_probe.cpp $(wildcard host/*.hpp) host/volume_state.h | bin
 	$(CXX_WIN) $(WINFLAGS) $< -lpropsys -loleaut32 -lole32 -luuid -o $@
 bin/apo_control.exe: host/apo_control.cpp $(wildcard host/*.hpp) | bin
 	$(CXX_WIN) $(WINFLAGS) $< -loleaut32 -lole32 -luuid -o $@
+bin/seed3d.exe: packaging/seed3d.c | bin
+	$(CC_WIN) -std=c11 -Wall -Wextra -Werror -O2 -static $< -loleaut32 -ladvapi32 -o $@
 bin/pulse_state: host/pulse_state.c host/volume_state.h | bin
 	$(CC) $(CPPFLAGS) $(CFLAGS) -std=c11 -Wall -Wextra -Werror -O2 $< $$(pkg-config --cflags --libs libpulse) $(LDFLAGS) -o $@
 install: all
