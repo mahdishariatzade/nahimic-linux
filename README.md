@@ -329,6 +329,7 @@ The packages that were installed for it stay behind, because other software may 
 | "The audio service is not running" | Run `systemctl --user restart nahimic.service`, then reopen the app. |
 | Effects stop when headphones are plugged in | Expected. Effects only apply to the built-in speakers and resume when you unplug. |
 | `unverified hardware profile in use` in the log | Expected on Realtek ALC256. It is a reminder that the tuning is borrowed. |
+| "Effect playback is linked to ... instead of the built-in speakers" | Another application owns the system output, EasyEffects being the usual one. Quit it, then `systemctl --user restart nahimic.service`. Only one effect chain can process the speakers at a time. |
 
 Useful commands:
 

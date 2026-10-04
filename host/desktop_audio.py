@@ -82,7 +82,14 @@ class DesktopAudio:
             raise RuntimeError("Original audio playback stream is missing")
         linked = renderers[0]["sink"] == physical["index"]
         if renderers[0]["sink"] not in (physical["index"], 4294967295):
-            raise RuntimeError("Effect playback is linked to an unexpected device")
+            # Name the device that took the stream: another effect application
+            # owning the default sink is the usual cause and is actionable.
+            taken = next((name for name, item in sinks.items()
+                          if item["index"] == renderers[0]["sink"]), "another device")
+            raise RuntimeError(f"Effect playback is linked to {taken} instead of the built-in "
+                               "speakers. Another application is processing the system output "
+                               "(EasyEffects is the common case); quit it, or make the built-in "
+                               "speakers the default output again, then restart the service.")
         active = enabled and linked and bool(applications)
         status = {"enabled": enabled, "active": active, "volume": round(max(actual[0]) / 65536 * 100),
                   "muted": actual[1], "applications": len(applications), "output": physical["description"]}
