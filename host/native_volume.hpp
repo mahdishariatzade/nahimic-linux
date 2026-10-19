@@ -37,8 +37,10 @@ public:
     HRESULT read(apo_volume_state& state){
         if(failed())return E_FAIL;
         if(!mapped_)return fail("state mapping absent");
-        if(!apo_volume_snapshot(mapped_, &state))return fail("incoherent state snapshot");
-        FILETIME now;GetSystemTimeAsFileTime(&now);
+        // pulse_state stamps with CLOCK_REALTIME. Wine's GetSystemTimeAsFileTime may read
+        // CLOCK_REALTIME_COARSE and lag by one kernel tick; the precise variant reads
+        // CLOCK_REALTIME, so both sides share one clock.
+        FILETIME now;GetSystemTimePreciseAsFileTime(&now);
         uint64_t ticks=(uint64_t(now.dwHighDateTime)<<32)|now.dwLowDateTime;
         // The writer stamps with clock_gettime, this side reads the Wine clock,
         // so a fresh snapshot can legitimately be a fraction of a millisecond
