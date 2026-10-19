@@ -37,6 +37,7 @@ public:
     HRESULT read(apo_volume_state& state){
         if(failed())return E_FAIL;
         if(!mapped_)return fail("state mapping absent");
+        if(!apo_volume_snapshot(mapped_,&state))return fail("incoherent state snapshot");
         // pulse_state stamps with CLOCK_REALTIME. Wine's GetSystemTimeAsFileTime may read
         // CLOCK_REALTIME_COARSE and lag by one kernel tick; the precise variant reads
         // CLOCK_REALTIME, so both sides share one clock.
