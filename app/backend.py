@@ -1,4 +1,5 @@
 """Original effect controls and installed application state."""
+import copy
 import json
 import os
 from pathlib import Path
@@ -20,6 +21,9 @@ PROFILES = {
 
 
 class Backend:
+    def __init__(self):
+        self._cached_settings = None
+
     def control(self, *args):
         api = "Z:" + str(Path("/usr/share/nahimic-linux/vendor/NahimicAPO4API.dll")).replace("/", "\\")
         result = subprocess.run(["wine", str(Path(__file__).resolve().parents[1] / "bin/apo_control.exe"), api, *args],
@@ -30,8 +34,7 @@ class Backend:
             raise RuntimeError(result.stderr.strip()[-1200:] or "Vendor effect control failed")
         return result.stdout
 
-    def settings(self):
-        output = self.control("--settings")
+    def _parse_settings(self, output):
         profile = re.search(r"(?:global_profile|default_application) id=\S+ name=(\S+)", output)
         if not profile:
             raise RuntimeError("Could not read the current effect profile")
@@ -46,17 +49,34 @@ class Backend:
                 if found:
                     item[key] = float(found[1])
             settings[match[1]] = item
-        return {"profile": profile[1], "settings": settings}
+        res = {"profile": profile[1], "settings": settings}
+        self._cached_settings = res
+        return copy.deepcopy(res)
+
+    def settings(self):
+        output = self.control("--settings")
+        return self._parse_settings(output)
 
     def set_setting(self, name, value):
-        self.control("--set-setting", name, str(value))
-        state = self.settings()
-        if abs(state["settings"][name]["value"] - float(value)) > 1e-5:
+        output = self.control("--set-setting", name, str(value))
+        match = re.search(r"name=(kSet_\w+) value=([-+\d.eE]+)", output)
+        if not match or match[1] != name or abs(float(match[2]) - float(value)) > 1e-5:
             raise RuntimeError("The effect setting was not applied")
-        return state
+        if self._cached_settings and "settings" in self._cached_settings and name in self._cached_settings["settings"]:
+            self._cached_settings["settings"][name]["value"] = float(match[2])
+            return copy.deepcopy(self._cached_settings)
+        return self.settings()
 
     def profile(self, name):
-        self.control("--global-profile", "{" + PROFILES[name][1] + "}")
+        output = self.control("--global-profile", "{" + PROFILES[name][1] + "}")
+        try:
+            state = self._parse_settings(output)
+            if state["settings"]:
+                if state["profile"] != name:
+                    raise RuntimeError("The effect profile was not applied")
+                return state
+        except Exception:
+            pass
         state = self.settings()
         if state["profile"] != name:
             raise RuntimeError("The effect profile was not applied")

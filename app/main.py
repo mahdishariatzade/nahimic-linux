@@ -1,4 +1,5 @@
 """Native desktop controls for Nahimic speaker effects."""
+import copy
 from concurrent.futures import ThreadPoolExecutor
 from collections import deque
 import os
@@ -7,22 +8,36 @@ import subprocess
 import sys
 import time
 
-from PySide6.QtCore import QTimer, Qt, QLockFile, QRectF, QSize
+from PySide6.QtCore import QTimer, Qt, QLockFile, QRectF, QSize, QObject, Signal
 from PySide6.QtGui import QIcon, QPainter, QColor, QPen, QPixmap, QFont, QLinearGradient
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QCheckBox, QSlider, QFrame, QDialog, QToolButton, QButtonGroup, QSizePolicy, QStyle, QStyleOptionToolButton, QStylePainter, QComboBox, QMessageBox)
+    QLabel, QPushButton, QCheckBox, QSlider, QFrame, QDialog, QToolButton, QButtonGroup, QSizePolicy, QStyle, QStyleOptionToolButton, QStyleOptionSlider, QStylePainter, QComboBox, QMessageBox)
 from backend import Backend, DATA, PROFILES
 from i18n import Translations, LANGUAGES
 from window_frame import decorate
 
 ASSETS = Path(__file__).with_name('assets')
+_ASSET_CACHE = {}
+_SCALED_CACHE = {}
 
 def asset(name):
-    return QPixmap(str(ASSETS / name))
+    pixmap = _ASSET_CACHE.get(name)
+    if pixmap is None:
+        pixmap = QPixmap(str(ASSETS / name))
+        _ASSET_CACHE[name] = pixmap
+    return pixmap
+
+def scaled_asset(name, width, height):
+    key = (name, width, height)
+    pixmap = _SCALED_CACHE.get(key)
+    if pixmap is None:
+        pixmap = asset(name).scaled(width, height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        _SCALED_CACHE[key] = pixmap
+    return pixmap
 
 STYLE = """
-QWidget { color: #e5eaf0; font-family: 'Noto Sans CJK SC'; font-size: 12px; }
+QWidget { color: #e5eaf0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', Ubuntu, sans-serif; font-size: 12px; }
 QMainWindow, QWidget#root, QDialog { background: #142130; }
 QFrame#navigation { background: #0c1722; border: none; }
 QFrame#device { background: #172635; border-right: 1px solid #0b1925; }
@@ -63,6 +78,10 @@ QCheckBox:disabled { color: #536373; }
 """
 
 
+class _Bridge(QObject):
+    wake = Signal()
+
+
 class Toggle(QCheckBox):
     """Native checkbox input using the original effect power artwork."""
     def __init__(self, label, parent=None, mute=False):
@@ -93,6 +112,31 @@ class Toggle(QCheckBox):
 
 
 class ControlSlider(QSlider):
+    def __init__(self, orientation=Qt.Horizontal, parent=None):
+        super().__init__(orientation, parent)
+        self.setCursor(Qt.PointingHandCursor)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            opt = QStyleOptionSlider()
+            self.initStyleOption(opt)
+            handle_rect = self.style().subControlRect(
+                QStyle.CC_Slider, opt, QStyle.SC_SliderHandle, self)
+            if not handle_rect.contains(event.pos()):
+                if self.orientation() == Qt.Vertical:
+                    val = QStyle.sliderValueFromPosition(
+                        self.minimum(), self.maximum(),
+                        event.pos().y(), self.height(), True)
+                else:
+                    val = QStyle.sliderValueFromPosition(
+                        self.minimum(), self.maximum(),
+                        event.pos().x(), self.width(), False)
+                self.setValue(val)
+                self.sliderReleased.emit()
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
     def keyReleaseEvent(self, event):
         super().keyReleaseEvent(event)
         if event.key() in (Qt.Key_Left, Qt.Key_Right, Qt.Key_Up, Qt.Key_Down,
@@ -107,6 +151,10 @@ class ControlSlider(QSlider):
 
 class SpacedToolButton(QToolButton):
     """Keep native button semantics while giving icon and text an explicit gap."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setCursor(Qt.PointingHandCursor)
+
     def sizeHint(self):
         size = super().sizeHint()
         if self.toolButtonStyle() == Qt.ToolButtonTextBesideIcon:
@@ -151,6 +199,7 @@ class ProfileButton(SpacedToolButton):
         if self.isChecked():
             painter = QPainter(self)
             painter.fillRect(0, self.height() - 3, self.width(), 3, QColor('#00dcf5'))
+            painter.end()
 
 
 class Panel(QMainWindow):
@@ -159,6 +208,8 @@ class Panel(QMainWindow):
         self.backend = Backend()
         self.translations = Translations(DATA / 'interface.ini')
         self.pool = ThreadPoolExecutor(max_workers=1)
+        self.bridge = _Bridge(self)
+        self.bridge.wake.connect(self.poll)
         self.pending = None
         self.jobs = deque()
         self.awaiting_state = {}
@@ -168,6 +219,8 @@ class Panel(QMainWindow):
         self.busy_timer.timeout.connect(self.show_pending_status)
         self.settings_loaded = False
         self.loaded_pid = None
+        self.profile_cache = {}
+        self.loaded_profile = None
         self.values = {}; self.switches = {}; self.modes = {}; self.effect_images = {}
         self.setWindowTitle('Nahimic Linux')
         self.setWindowIcon(QIcon(str(Path(__file__).with_name('nahimic.svg'))))
@@ -229,7 +282,7 @@ class Panel(QMainWindow):
             button.setCheckable(True); button.setFixedHeight(82); button.setMinimumWidth(100)
             button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             button.setStyleSheet('QToolButton { padding: 5px; background: transparent; }')
-            button.clicked.connect(lambda checked, n=name: self.submit(lambda: self.backend.profile(n),'settings','profile',n))
+            button.clicked.connect(lambda checked, n=name: self.on_profile_clicked(n))
             group.addButton(button); self.modes[name]=button; profile_layout.addWidget(button,1)
         page.addWidget(self.profiles)
         toolbar = QFrame(); toolbar.setObjectName('toolbar'); tools = QHBoxLayout(toolbar); tools.setContentsMargins(12,7,16,7)
@@ -270,7 +323,7 @@ class Panel(QMainWindow):
             unit=QLabel('dB'); unit.setObjectName('caption'); readout.addWidget(unit,0,Qt.AlignVCenter); readout.addStretch(); column.addLayout(readout)
             slider=ControlSlider(Qt.Horizontal); slider.setFixedWidth(130); slider.setAccessibleName(gain_text)
             slider.valueChanged.connect(lambda v,l=value:l.setText(str(v)))
-            slider.sliderReleased.connect(lambda n=gain,s=slider:self.submit(lambda v=s.value():self.backend.set_setting(n,v),'settings',n,s.value()))
+            slider.sliderReleased.connect(lambda n=gain,s=slider:(self.update_cached_setting(n, s.value()), self.submit(lambda v=s.value():self.backend.set_setting(n,v),'settings',n,s.value())))
             self.values[gain]=slider; column.addWidget(slider,0,Qt.AlignHCenter)
             note=QLabel(description); note.setObjectName('caption'); note.setAlignment(Qt.AlignCenter); note.setWordWrap(True); note.setFixedHeight(36); column.addWidget(note); column.addStretch()
             lower.addWidget(effect,1)
@@ -290,7 +343,7 @@ class Panel(QMainWindow):
             name='kSet_EQ'+band+'GainDB'; column=QVBoxLayout(); value=QLabel('0'); value.setObjectName('readout'); value.setAlignment(Qt.AlignCenter); column.addWidget(value)
             slider=ControlSlider(Qt.Vertical); slider.setMinimumHeight(180); slider.setFixedWidth(24); self.translations.bind(slider, 'accessibleName', '{frequency} Hz gain', frequency=label)
             slider.valueChanged.connect(lambda v,l=value:l.setText(f'{v:+d}' if v else '0'))
-            slider.sliderReleased.connect(lambda n=name,s=slider:self.submit(lambda v=s.value():self.backend.set_setting(n,v),'settings',n,s.value()))
+            slider.sliderReleased.connect(lambda n=name,s=slider:(self.update_cached_setting(n, s.value()), self.submit(lambda v=s.value():self.backend.set_setting(n,v),'settings',n,s.value())))
             self.values[name]=slider; column.addWidget(slider,1,Qt.AlignHCenter)
             frequency=QLabel(label); frequency.setObjectName('caption'); frequency.setAlignment(Qt.AlignCenter); column.addWidget(frequency); bands.addLayout(column,1)
         eq.addLayout(bands,1)
@@ -337,11 +390,45 @@ class Panel(QMainWindow):
         self.language.setItemText(0, self.translations.text('System default'))
         self.preferences.adjustSize()
 
+    def on_profile_clicked(self, name):
+        if name in self.profile_cache:
+            self.apply_profile_visuals(self.profile_cache[name])
+        self.submit(lambda: self.backend.profile(name), 'settings', 'profile', name)
+
+    def apply_profile_visuals(self, state):
+        for name, button in self.modes.items():
+            button.setChecked(name == state['profile'])
+        for name, slider in self.values.items():
+            if slider.isSliderDown(): continue
+            item = state['settings'].get(name)
+            if item:
+                slider.setRange(round(item['min']), round(item['max']))
+                slider.setValue(round(item['value']))
+        for name, switch in self.switches.items():
+            item = state['settings'].get(name)
+            if item:
+                switch.setChecked(bool(item['value']))
+        eq_low = state['settings'].get('kSet_EQ31HzGainDB')
+        if eq_low:
+            self.scale_high.setText(f"+{round(eq_low['max'])}")
+            self.scale_low.setText(str(round(eq_low['min'])))
+        self.update_effect_images()
+        self.loaded_profile = state['profile']
+
+    def update_cached_setting(self, name, value):
+        if self.loaded_profile and self.loaded_profile in self.profile_cache:
+            prof_settings = self.profile_cache[self.loaded_profile].get('settings')
+            if prof_settings and name in prof_settings:
+                prof_settings[name]['value'] = value
+
     def effect_switch(self, name, label):
-        switch=Toggle(label)
-        switch.clicked.connect(lambda checked:self.submit(lambda:self.backend.set_setting(name,int(checked)),'settings',name,int(checked)))
+        switch = Toggle(label)
+        def on_clicked(checked):
+            self.update_cached_setting(name, int(checked))
+            self.submit(lambda: self.backend.set_setting(name, int(checked)), 'settings', name, int(checked))
+        switch.clicked.connect(on_clicked)
         switch.toggled.connect(self.update_effect_images)
-        self.switches[name]=switch
+        self.switches[name] = switch
         return switch
 
     def show_equalizer(self):
@@ -378,13 +465,19 @@ class Panel(QMainWindow):
                 else:
                     self.jobs.append(job)
             return
-        self.pending = (self.pool.submit(function), kind, key, value)
+        future = self.pool.submit(function)
+        if hasattr(future, 'add_done_callback'):
+            future.add_done_callback(lambda _: self.bridge.wake.emit())
+        self.pending = (future, kind, key, value)
 
     def refresh(self):
         if not self.pending:
             if self.jobs:
                 function, kind, key, value = self.jobs.popleft()
-                self.pending = (self.pool.submit(function), kind, key, value)
+                future = self.pool.submit(function)
+                if hasattr(future, 'add_done_callback'):
+                    future.add_done_callback(lambda _: self.bridge.wake.emit())
+                self.pending = (future, kind, key, value)
             else:
                 self.submit(self.backend.status, 'status')
 
@@ -480,11 +573,11 @@ class Panel(QMainWindow):
         for name, (label, on, off) in self.effect_images.items():
             enabled = self.switches[name].isChecked()
             if label.property('effectEnabled') != enabled:
-                label.setPixmap(asset(on if enabled else off).scaled(
-                    label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                sz = label.size()
+                label.setPixmap(scaled_asset(on if enabled else off, sz.width(), sz.height()))
                 label.setProperty('effectEnabled', enabled)
 
-    def apply_settings(self,state):
+    def apply_settings(self, state):
         if state['profile'] not in self.modes:
             raise ValueError(self.translations.text('Unknown audio preset: {profile}', profile=state['profile']))
         protected = self.pending_keys()
@@ -492,15 +585,43 @@ class Panel(QMainWindow):
             return
         for name, button in self.modes.items():
             button.setChecked(name == state['profile'])
-        for name,slider in self.values.items():
+        for name, slider in self.values.items():
             if name in protected or slider.isSliderDown(): continue
-            item=state['settings'][name];slider.setRange(round(item['min']),round(item['max']));slider.setValue(round(item['value']))
-        for name,switch in self.switches.items():
+            item = state['settings'][name]
+            slider.setRange(round(item['min']), round(item['max']))
+            slider.setValue(round(item['value']))
+        for name, switch in self.switches.items():
             if name not in protected: switch.setChecked(bool(state['settings'][name]['value']))
         self.scale_high.setText(f"+{round(state['settings']['kSet_EQ31HzGainDB']['max'])}")
         self.scale_low.setText(str(round(state['settings']['kSet_EQ31HzGainDB']['min'])))
         self.update_effect_images()
-        self.settings_loaded=True
+        self.loaded_profile = state['profile']
+        self.profile_cache[state['profile']] = copy.deepcopy(state)
+        self._seed_factory_profiles(state)
+        self.settings_loaded = True
+
+    def _seed_factory_profiles(self, base_state):
+        factory_dir = Path('/usr/share/nahimic-linux/factory/AudioProfiles')
+        if not factory_dir.is_dir():
+            return
+        import xml.etree.ElementTree as ET
+        for prof in ('Music', 'Movie', 'Communication', 'Gaming'):
+            if prof not in self.profile_cache:
+                nsx_file = factory_dir / f'{prof}.nsx'
+                if nsx_file.exists():
+                    try:
+                        tree = ET.parse(nsx_file)
+                        pst = copy.deepcopy(base_state)
+                        pst['profile'] = prof
+                        for elem in tree.find('Settings'):
+                            if elem.tag in pst['settings'] and 'Value' in elem.attrib:
+                                try:
+                                    pst['settings'][elem.tag]['value'] = float(elem.attrib['Value'])
+                                except ValueError:
+                                    pass
+                        self.profile_cache[prof] = pst
+                    except Exception:
+                        pass
 
 
 def main():

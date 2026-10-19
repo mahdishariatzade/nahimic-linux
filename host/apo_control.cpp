@@ -272,14 +272,12 @@ int wmain(int argc,wchar_t** argv){
         if(select_profile){
             GUID actual{};
             if(!check("ReadSelectedProfileId",profile->GetId(&actual)) || actual!=selected)break;
-        }
-        profile->Release();profile=nullptr;
-        LONG count=0;if(!check("GetProfileCount",control->GetProfileCount(&count)))break;
-        std::printf("profile_count=%ld\n",count);
-        valid=true;
-        for(LONG i=0;i<count;++i){
-            if(!check("GetProfile",control->GetProfile(i,&profile))){valid=false;break;}
-            valid=describe(profile,"profile");profile->Release();profile=nullptr;if(!valid)break;
+            ControlStore* store=nullptr;
+            hr=profile->OpenStore(&store);
+            if(!check("OpenSettingsStore",hr))break;
+            valid=describe_store(store);
+            store->Release();
+            break;
         }
     }while(false);
     if(profile)profile->Release();

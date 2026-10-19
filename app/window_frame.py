@@ -76,16 +76,23 @@ class TitleBar(QWidget):
         self.target.showNormal() if self.target.isMaximized() else self.target.showMaximized()
 
     def eventFilter(self, watched, event):
-        if event.type() in (QEvent.Resize, QEvent.Show, QEvent.WindowStateChange):
-            w,h = self.target.width(),self.target.height(); n=6
-            rects=((0,n,n,h-2*n),(w-n,n,n,h-2*n),(n,0,w-2*n,n),(n,h-n,w-2*n,n),
-                   (0,0,n,n),(w-n,h-n,n,n),(w-n,0,n,n),(0,h-n,n,n))
-            for edge, rect in zip(self.edges,rects):
+        etype = event.type()
+        if etype == QEvent.Resize:
+            w, h = self.target.width(), self.target.height(); n = 6
+            rects = ((0,n,n,h-2*n), (w-n,n,n,h-2*n), (n,0,w-2*n,n), (n,h-n,w-2*n,n),
+                     (0,0,n,n), (w-n,h-n,n,n), (w-n,0,n,n), (0,h-n,n,n))
+            for edge, rect in zip(self.edges, rects):
+                edge.setGeometry(*rect)
+        elif etype in (QEvent.Show, QEvent.WindowStateChange):
+            w, h = self.target.width(), self.target.height(); n = 6
+            rects = ((0,n,n,h-2*n), (w-n,n,n,h-2*n), (n,0,w-2*n,n), (n,h-n,w-2*n,n),
+                     (0,0,n,n), (w-n,h-n,n,n), (w-n,0,n,n), (0,h-n,n,n))
+            for edge, rect in zip(self.edges, rects):
                 edge.setGeometry(*rect); edge.setVisible(not self.target.isMaximized()); edge.raise_()
-            if hasattr(self,'maximize'):
-                icon=QStyle.SP_TitleBarNormalButton if self.target.isMaximized() else QStyle.SP_TitleBarMaxButton
-                self.maximize.symbol=icon;self.maximize.update()
-        return super().eventFilter(watched,event)
+            if hasattr(self, 'maximize'):
+                icon = QStyle.SP_TitleBarNormalButton if self.target.isMaximized() else QStyle.SP_TitleBarMaxButton
+                self.maximize.symbol = icon; self.maximize.update()
+        return super().eventFilter(watched, event)
 
     def mousePressEvent(self,event):
         if event.button()==Qt.LeftButton:
