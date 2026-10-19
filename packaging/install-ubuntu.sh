@@ -45,6 +45,10 @@ BUILD_PACKAGES=(
 )
 
 install_dependencies() {
+    if [ "${SKIP_DEPS:-0}" = "1" ]; then
+        log "Skipping dependency installation (SKIP_DEPS=1)"
+        return 0
+    fi
     log "Installing distribution packages with apt"
     sudo apt-get update
     sudo apt-get install -y --no-install-recommends \

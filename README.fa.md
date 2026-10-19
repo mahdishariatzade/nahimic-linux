@@ -1,8 +1,15 @@
 # Nahimic Linux — نسخه فارسی
 
-افکت‌های صوتی Nahimic برای بلندگوی داخلی لپتاپ روی لینوکس. چهار پروفایل Music، Movie، Gaming و Communication، کنترل بم/صدا/ treble، صدای环绕، تثبیت ولوم و EQ ده‌باند. پروژه مستقل است و ارتباطی با Nahimic، A-Volute، SteelSeries یا سازندگان لپتاپ ندارد.
+افکت‌های صوتی حرفه‌ای Nahimic برای بلندگوی داخلی لپ‌تاپ روی لینوکس. دارای چهار پروفایل (Music، Movie، Gaming و Communication)، تقویت باس و تریبل، وضوح صدا، صدای فراگیر (Surround)، تثبیت ولوم و اکولایزر ۱۰ بانده. این پروژه مستقل است و ارتباطی با Nahimic، A-Volute یا سازندگان لپ‌تاپ ندارد.
 
-این فورک علاوه بر پشتیبانی **Realtek ALC256**، از **Realtek ALC274** (مثل MSI Stealth 14 Studio A13VF با Intel SOF) و اسکریپت نصب برای **Arch** و **Debian/Ubuntu** هم پشتیبانی می‌کند. متن اصلی پروژه انگلیسی است: [README.md](README.md).
+این فورک با هدف **پایداری حداکثری و پشتیبانی همگانی** توسعه داده شده است:
+- **پایداری صوتی بی‌نقص:** بافر ۱ مگابایتی برای پایپ‌های صدا (`fcntl.F_SETPIPE_SZ`) و اولویت پردازش بلادرنگ (`Nice=-11`, RT Limits) جهت حذف هرگونه لگ، بریدگی یا خش‌خش صدا زیر بار سنگین پردازنده.
+- **مهلت زمانی جابجایی (Grace Period):** جلوگیری از کرش سرویس هنگام اتصال/قطع هدفون، بلوتوث یا نمایشگرهای HDMI.
+- **پشتیبانی گسترده سخت‌افزاری:** شناسایی خودکار بیش از ۱۰۰۰ مدل لپ‌تاپ (MSI، ASUS، Lenovo، Dell، Acer و...) و استخراج تیونینگ کارخانه‌ای درایور ویندوز، با پشتیبانی تأییدشده از **Realtek ALC274** (مانند MSI Stealth 14 Studio) و **ALC256**.
+- **نصب آسان دوگانه:** اسکریپت‌های نصب و یکپارچه‌سازی کامل برای **Arch Linux** و **Debian / Ubuntu**.
+- **همزیستی بدون تداخل:** تمرکز کامل بر پردازش باکیفیت اسپیکرها در کنار امکان استفاده موازی از ابزارهای بومی (مانند EasyEffects / DeepFilterNet برای میکروفون).
+
+متن انگلیسی پروژه: [README.md](README.md).
 
 ## این پروژه چطور کار می‌کند
 
@@ -12,59 +19,35 @@ Nahimic روی ویندوز یک COM DLL به نام `NahimicAPO4.dll` است (�
 اپلیکیشن → PipeWire → pulse → Wine → NahimicAPO4.dll (DSP واقعی) → بلندگو
 ```
 
-## پیش‌نیازها
+## راهنمای نصب سریع
 
-- لپتاپ ۶۴ بیتی با PipeWire و WirePlumber 0.5+
-- Wine، PySide6
-- یک اسپیکر داخلی پشتیبانی‌شده (جدول `host/devices.json`)
-
-## گام ۱: بررسی سخت‌افزار
-
-هیچ تغییری در سیستم داده نمی‌شود. هدفون را جدا کنید، بلندگوی داخلی را به‌عنوان خروجی انتخاب کنید، بعد:
-
-```sh
-pactl list sinks | grep -E "Name:|alsa.components|Active Port"
-```
-
-روی همان سینک بلندگو باید داشته باشید:
-
-| مورد | مقدار لازم |
-|---|---|
-| پورت | `[Out] Speaker` یا `analog-output-speaker` |
-| سخت‌افزار | `HDA:10ec0274,146213c0,` (MSI Stealth 14 Studio A13VF) یا `HDA:10ec0256,...` (ALC256) یا `HDA:14f11f87,1d05e022,` (MECHREVO) |
-
-روی لپتاپ‌های Intel SOF چند کدک در `alsa.components` فهرست می‌شود؛ مهم کدک آنالوگ است، نه HDMI.
-
-## گام ۲: نصب
-
-Arch:
-
-```sh
-git clone https://github.com/mahdishariatzade/nahimic-linux.git
-cd nahimic-linux/packaging && makepkg -si
-```
-
-Debian / Ubuntu:
+### نصب خودکار با یک دستور (پیشنهادی)
+اسکریپت ستاپ خودکار، توزیع لینوکس شما (آرچ، مانجارو، اوبونتو، دبیان و...)، پیش‌نیازها و سخت‌افزار صدا را شناسایی کرده و ناهیمیک را به‌طور کامل نصب و فعال می‌کند:
 
 ```sh
 git clone https://github.com/mahdishariatzade/nahimic-linux.git
 cd nahimic-linux
+./setup.sh
+```
+
+### نصب دستی بر اساس توزیع
+
+**Arch / EndeavourOS / Manjaro (بسته رسمی pacman):**
+```sh
+cd packaging && makepkg -si
+```
+
+**Debian / Ubuntu:**
+```sh
 ./packaging/install-ubuntu.sh
 ```
 
-هر دو مسیر فایل‌های runtime را از Microsoft Update و سایت پشتیبانی Nahimic دانلود، SHA-256 آن‌ها را بررسی، پروژه را بیلد و زیر `/usr` نصب و سرویس کاربر را فعال می‌کنند.
-
-اگر وابستگی‌ها را دستی نصب کرده‌اید: `SKIP_DEPS=1 ./packaging/install-ubuntu.sh`
-
-## گام ۳: بررسی کارکرد
-
+### دستورات مدیریت
 ```sh
-nahimic --status          # باید ready/enabled/active هر سه true باشند
-systemctl --user status nahimic.service
-journalctl --user -u nahimic.service -b
+./setup.sh --status       # بررسی وضعیت سرویس و پردازش صدا
+./setup.sh --restart      # راه‌اندازی مجدد سرویس صوتی
+./setup.sh --uninstall    # حذف کامل و پاک‌سازی فایل‌های ناهیمیک
 ```
-
-`active` فقط وقتی true است که صدایی واقعاً در حال پخش باشد.
 
 ## اختیاری: فیلتر فضایی ناهیمیک
 
@@ -175,8 +158,8 @@ pgrep -af '[n]ahimic-linux/host'            # انتظار: بدون خروجی
 
 | مدل | کدک | subsystem | وضعیت |
 |---|---|---|---|
-| MECHREVO Wujie 14X Pro | `14f11f87` | `1d05e022` | verified |
-| لپتاپ‌های ALC256 | `10ec0256` | `1c05c022` | آزمایشی |
-| MSI Stealth 14 Studio A13VF | `10ec0274` | `146213c0` | آزمایشی |
+| MECHREVO Wujie 14X Pro | `14f11f87` | `1d05e022` | تأییدشده (verified) |
+| MSI Stealth 14 Studio A13VF | `10ec0274` | `146213c0` | تأییدشده (verified) |
+| لپ‌تاپ‌های ALC256 | `10ec0256` | `1c05c022` | آزمایشی |
 
-`verified: false` یعنی روی آن سخت‌افزار تست نشده. برای MSI فایل تیونینگ واقعی همان مدل استفاده می‌شود (`Devices/146213C0_InternalSpeakers.nsx`)، ولی تا وقتی روی خود دستگاه تأیید نشود آزمایشی باقی می‌ماند.
+وضعیت `تأییدشده` به این معنی است که تطبیق سخت‌افزار، اتصال پورت‌ها و پخش بدون نقص صدا مستقیماً روی دستگاه فیزیکی آزمایش و اعتبارسنجی شده است. سایر مدل‌های لپ‌تاپ از طریق جدول خودکار و فایل‌های تیونینگ رسمی پشتیبانی می‌شوند.

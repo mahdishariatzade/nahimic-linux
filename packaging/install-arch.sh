@@ -41,6 +41,10 @@ BUILD_PACKAGES=(
 )
 
 install_dependencies() {
+    if [ "${SKIP_DEPS:-0}" = "1" ]; then
+        log "Skipping dependency installation (SKIP_DEPS=1)"
+        return 0
+    fi
     log "Installing distribution packages with pacman"
     sudo pacman -S --needed --noconfirm "${RUNTIME_PACKAGES[@]}" "${BUILD_PACKAGES[@]}"
 }

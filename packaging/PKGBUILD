@@ -1,11 +1,11 @@
-# Maintainer: Kevin Sims (fork of wearzdk/nahimic-linux)
-# Contributor: wearzdk <hi@wearzdk.me>
+# Maintainer: Mahdi Shariatzade (fork of wearzdk/nahimic-linux)
+# Contributor: Kevin Sims, wearzdk <hi@wearzdk.me>
 pkgname=nahimic-linux
 pkgver=0.3.0
 pkgrel=1
 pkgdesc='Nahimic speaker effects and equalizer for supported Linux laptops'
 arch=('x86_64')
-url='https://github.com/KevinLKs/nahimic-linux'
+url='https://github.com/mahdishariatzade/nahimic-linux'
 license=('MIT' 'LicenseRef-Nahimic')
 depends=('python' 'pyside6' 'wine' 'pipewire' 'pipewire-pulse' 'wireplumber>=0.5' 'libpulse' 'systemd' 'hicolor-icon-theme' 'bash' 'glibc')
 makedepends=('mingw-w64-gcc' 'pkgconf' 'cabextract' 'git')
