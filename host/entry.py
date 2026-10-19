@@ -62,7 +62,8 @@ def initialize():
     marker(RUNTIME / "prefix/.nahimic-linux-owner")
     if not (RUNTIME / "preferences.json").exists():
         atomic_json(RUNTIME / "preferences.json", {"enabled": True})
-    atomic_json(DATA / "installation.json", {"version": "0.3.0", "target": target})
+    atomic_json(DATA / "installation.json",
+                {"version": "0.3.0", "target": target})
     return target
 
 
@@ -106,7 +107,8 @@ def serve():
     # The session marker guards run_local, so a runtime directory that was
     # removed underneath an existing installation is rebuilt instead of failing.
     intact = installation.is_file() and (RUNTIME / ".nahimic-session").is_file()
-    target = json.loads(installation.read_text())["target"] if intact else initialize()
+    recorded = json.loads(installation.read_text()) if intact else {}
+    target = recorded["target"] if intact else initialize()
     session_path = RUNTIME / "session.json"
     if session_path.exists():
         session = json.loads(session_path.read_text())
@@ -134,11 +136,12 @@ def serve():
         if stopped:
             return
         atomic_json(RUNTIME / "desktop-state.json", {"waiting_for_speakers": False})
-        child = subprocess.Popen([sys.executable, str(ROOT / "host/run_local.py"),
-                 "--exe", str(ROOT / "bin/apo_probe.exe"),
-                 "--dll", str(SHARE / "vendor/NahimicAPO4.dll"),
-                 "--settings", str(SHARE / "factory"), "--target", target,
-                 "--state-dir", str(RUNTIME)])
+        command = [sys.executable, str(ROOT / "host/run_local.py"),
+                   "--exe", str(ROOT / "bin/apo_probe.exe"),
+                   "--dll", str(SHARE / "vendor/NahimicAPO4.dll"),
+                   "--settings", str(SHARE / "factory"), "--target", target,
+                   "--state-dir", str(RUNTIME)]
+        child = subprocess.Popen(command)
         if stopped:
             child.terminate()
         code = child.wait()

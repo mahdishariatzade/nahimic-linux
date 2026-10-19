@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import subprocess
+import time
 import devices
 
 
@@ -34,11 +35,13 @@ def supported_speaker(sink):
 
 
 class DesktopAudio:
-    def __init__(self, work, sink, target):
+    def __init__(self, work, sink, target, grace_period=2.0):
         self.work, self.sink, self.target = Path(work), sink, target
         self.enabled = None
         self.node_id = None
         self.last_status = None
+        self.grace_period = grace_period
+        self._error_started_at = None
 
     def sinks(self):
         return {s["name"]: s for s in json.loads(pulse("--format=json", "list", "sinks"))}
@@ -78,18 +81,33 @@ class DesktopAudio:
                      if s.get("properties", {}).get("node.name") == self.sink + "_render"]
         if initializing and not renderers:
             return False
+
+        renderer_error = None
         if len(renderers) != 1:
-            raise RuntimeError("Original audio playback stream is missing")
-        linked = renderers[0]["sink"] == physical["index"]
-        if renderers[0]["sink"] not in (physical["index"], 4294967295):
+            renderer_error = RuntimeError("Original audio playback stream is missing")
+        elif renderers[0]["sink"] not in (physical["index"], 4294967295):
             # Name the device that took the stream: another effect application
             # owning the default sink is the usual cause and is actionable.
             taken = next((name for name, item in sinks.items()
                           if item["index"] == renderers[0]["sink"]), "another device")
-            raise RuntimeError(f"Effect playback is linked to {taken} instead of the built-in "
-                               "speakers. Another application is processing the system output "
-                               "(EasyEffects is the common case); quit it, or make the built-in "
-                               "speakers the default output again, then restart the service.")
+            renderer_error = RuntimeError(f"Effect playback is linked to {taken} instead of the built-in "
+                                          "speakers. Another application is processing the system output "
+                                          "(EasyEffects is the common case); quit it, or make the built-in "
+                                          "speakers the default output again, then restart the service.")
+
+        if renderer_error is not None:
+            if initializing or self.grace_period <= 0:
+                raise renderer_error
+            now = time.monotonic()
+            if self._error_started_at is None:
+                self._error_started_at = now
+                return False
+            if now - self._error_started_at < self.grace_period:
+                return False
+            raise renderer_error
+
+        self._error_started_at = None
+        linked = renderers[0]["sink"] == physical["index"]
         active = enabled and linked and bool(applications)
         status = {"enabled": enabled, "active": active, "volume": round(max(actual[0]) / 65536 * 100),
                   "muted": actual[1], "applications": len(applications), "output": physical["description"]}

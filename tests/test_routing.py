@@ -91,12 +91,26 @@ class RoutingTest(unittest.TestCase):
 
     def test_wrong_renderer_target_is_reported(self):
         self.streams[0]['sink'] = 40
-        with self.assertRaises(RuntimeError): self.router.tick()
+        self.assertFalse(self.router.tick())
+        with patch('time.monotonic', return_value=100.0):
+            self.router._error_started_at = 0.0
+            with self.assertRaises(RuntimeError): self.router.tick()
 
     def test_startup_waits_for_renderer_but_runtime_loss_is_reported(self):
         self.streams.pop(0)
         self.assertFalse(self.router.tick(initializing=True))
-        with self.assertRaises(RuntimeError): self.router.tick()
+        self.assertFalse(self.router.tick())
+        with patch('time.monotonic', return_value=100.0):
+            self.router._error_started_at = 0.0
+            with self.assertRaises(RuntimeError): self.router.tick()
+
+    def test_grace_period_recovers_if_stream_reconnects(self):
+        renderer = self.streams.pop(0)
+        self.assertFalse(self.router.tick())
+        self.assertIsNotNone(self.router._error_started_at)
+        self.streams.insert(0, renderer)
+        self.assertTrue(self.router.tick())
+        self.assertIsNone(self.router._error_started_at)
 
     def test_bypass_still_requires_both_capture_channels(self):
         graph = ('effect:monitor_FL\n  |-> effect_capture:input_FL\n'
