@@ -56,5 +56,14 @@
   "Maximize": "最大化 / 还原",
   "Close": "关闭",
   "The system did not confirm the change. Current state has been reloaded.": "设置未获系统确认，已重新读取当前状态。",
-  "Waiting for built-in speakers. Other outputs remain available.": "等待内置扬声器，其他输出正常使用"
+  "Waiting for built-in speakers. Other outputs remain available.": "等待内置扬声器，其他输出正常使用",
+  "Night mode": "夜间模式",
+  "Softens loud sounds and boosts quiet details.": "减弱过大音量并增强微弱细节。",
+  "Stereo widening": "立体声扩展",
+  "Expands the soundstage for built-in speakers.": "扩大内置扬声器的声场。",
+  "Volume boost": "音量增强",
+  "EQ Preset": "均衡器预设",
+  "Custom": "自定义",
+  "Flat": "原声",
+  "Reset": "重置"
 }

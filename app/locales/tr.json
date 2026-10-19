@@ -56,5 +56,14 @@
   "Maximize": "Büyüt / Geri yükle",
   "Close": "Kapat",
   "The system did not confirm the change. Current state has been reloaded.": "Sistem değişikliği onaylamadı. Güncel durum yeniden okundu.",
-  "Waiting for built-in speakers. Other outputs remain available.": "Dahili hoparlörler bekleniyor. Diğer çıkışlar kullanılabilir."
+  "Waiting for built-in speakers. Other outputs remain available.": "Dahili hoparlörler bekleniyor. Diğer çıkışlar kullanılabilir.",
+  "Night mode": "Gece modu",
+  "Softens loud sounds and boosts quiet details.": "Yüksek sesleri yumuşatır ve kısık detayları güçlendirir.",
+  "Stereo widening": "Stereo genişletme",
+  "Expands the soundstage for built-in speakers.": "Dahili hoparlörler için ses sahnesini genişletir.",
+  "Volume boost": "Ses artırma",
+  "EQ Preset": "EQ Ön Ayarı",
+  "Custom": "Özel",
+  "Flat": "Düz",
+  "Reset": "Sıfırla"
 }

@@ -4,8 +4,10 @@ import json
 import os
 from pathlib import Path
 import re
+import struct
 import subprocess
 import sys
+import time
 
 DATA = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "nahimic-linux"
 RUNTIME = DATA / "runtime"
@@ -57,15 +59,22 @@ class Backend:
         output = self.control("--settings")
         return self._parse_settings(output)
 
-    def set_setting(self, name, value):
-        output = self.control("--set-setting", name, str(value))
-        match = re.search(r"name=(kSet_\w+) value=([-+\d.eE]+)", output)
-        if not match or match[1] != name or abs(float(match[2]) - float(value)) > 1e-5:
-            raise RuntimeError("The effect setting was not applied")
-        if self._cached_settings and "settings" in self._cached_settings and name in self._cached_settings["settings"]:
-            self._cached_settings["settings"][name]["value"] = float(match[2])
+    def set_settings(self, items):
+        if isinstance(items, dict):
+            items = list(items.items())
+        args = ["--set-setting"]
+        for k, v in items:
+            args.extend([str(k), str(v)])
+        self.control(*args)
+        if self._cached_settings and "settings" in self._cached_settings:
+            for k, v in items:
+                if k in self._cached_settings["settings"]:
+                    self._cached_settings["settings"][k]["value"] = float(v)
             return copy.deepcopy(self._cached_settings)
         return self.settings()
+
+    def set_setting(self, name, value):
+        return self.set_settings([(name, value)])
 
     def profile(self, name):
         output = self.control("--global-profile", "{" + PROFILES[name][1] + "}")
@@ -87,34 +96,70 @@ class Backend:
         preferences["enabled"] = bool(enabled)
         atomic_json(RUNTIME / "preferences.json", preferences)
 
+    def _get_target(self):
+        if not hasattr(self, "_target") or not self._target:
+            self._target = json.loads((DATA / "installation.json").read_text())["target"]
+        return self._target
+
     def volume(self, value):
-        target = json.loads((DATA / "installation.json").read_text())["target"]
-        pulse("set-sink-volume", target, str(int(value)) + "%")
+        pulse("set-sink-volume", self._get_target(), str(int(value)) + "%")
 
     def mute(self, value):
-        target = json.loads((DATA / "installation.json").read_text())["target"]
-        pulse("set-sink-mute", target, str(int(value)))
+        pulse("set-sink-mute", self._get_target(), str(int(value)))
 
     def autostart(self, enabled):
         subprocess.run(["systemctl", "--user", "enable" if enabled else "disable", "nahimic.service"],
                        check=True, capture_output=True, text=True, timeout=10)
+        self._last_service_check = 0
+
+    def _read_native_volume(self):
+        volume_state_path = RUNTIME / "native-volume.state"
+        if not volume_state_path.exists():
+            return None
+        try:
+            data = volume_state_path.read_bytes()
+            if len(data) >= 600:
+                seq, _ = struct.unpack_from("<II", data, 0)
+                slot_offset = 8 + (seq & 1) * 296
+                slot = struct.unpack_from("<IIQIIIfff256s", data, slot_offset)
+                magic, valid, muted, master_db = slot[1], slot[3], slot[5], slot[6]
+                if magic == 0x41564F31 and valid:
+                    linear = 10.0 ** (master_db / 60.0)
+                    vol = max(0, min(100, round(linear * 100)))
+                    return vol, bool(muted)
+        except Exception:
+            pass
+        return None
 
     def status(self):
-        service = subprocess.run(["systemctl", "--user", "is-active", "nahimic.service"],
-                                 capture_output=True, text=True, timeout=5).stdout.strip()
-        auto = subprocess.run(["systemctl", "--user", "is-enabled", "nahimic.service"],
-                              capture_output=True, text=True, timeout=5).returncode == 0
+        now = time.monotonic()
+        if not hasattr(self, "_last_service_check") or now - self._last_service_check > 2.0 or getattr(self, "_service_active", None) != "active":
+            self._service_active = subprocess.run(["systemctl", "--user", "is-active", "nahimic.service"],
+                                                  capture_output=True, text=True, timeout=5).stdout.strip()
+            self._autostart_active = subprocess.run(["systemctl", "--user", "is-enabled", "nahimic.service"],
+                                                    capture_output=True, text=True, timeout=5).returncode == 0
+            self._last_service_check = now
+        service = self._service_active
+        auto = self._autostart_active
         result = {"ready": False, "service": service, "autostart": auto}
         status_path = RUNTIME / "desktop-state.json"
         if service == "active" and status_path.exists():
-            result["waiting_for_speakers"] = json.loads(status_path.read_text()).get("waiting_for_speakers", False)
+            try:
+                result["waiting_for_speakers"] = json.loads(status_path.read_text()).get("waiting_for_speakers", False)
+            except Exception:
+                pass
         path = RUNTIME / "session.json"
         if path.exists():
-            session = json.loads(path.read_text())
-            if session.get("ready") and service == "active":
-                status = RUNTIME / "desktop-state.json"
-                if status.exists():
-                    result.update(json.loads(status.read_text()))
-                    result["ready"] = True
-                    result["instance"] = session["pid"]
+            try:
+                session = json.loads(path.read_text())
+                if session.get("ready") and service == "active":
+                    if status_path.exists():
+                        result.update(json.loads(status_path.read_text()))
+                        result["ready"] = True
+                        result["instance"] = session["pid"]
+            except Exception:
+                pass
+        nv = self._read_native_volume()
+        if nv is not None and result.get("ready"):
+            result["volume"], result["muted"] = nv
         return result

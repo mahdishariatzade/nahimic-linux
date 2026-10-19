@@ -187,8 +187,8 @@ int wmain(int argc,wchar_t** argv){
     bool app_profile=argc==5 && wcscmp(argv[2],L"--application-profile-for")==0;
     bool select_profile=force_global || force_application || (argc==4 && wcscmp(argv[2],L"--profile")==0);
     bool device_settings=argc==4 && wcscmp(argv[2],L"--device-settings")==0;
-    bool write_setting=argc==5 && wcscmp(argv[2],L"--set-setting")==0;
-    bool write_global_setting=argc==5 && wcscmp(argv[2],L"--set-global-setting")==0;
+    bool write_setting=argc>=5 && (argc%2==1) && wcscmp(argv[2],L"--set-setting")==0;
+    bool write_global_setting=argc>=5 && (argc%2==1) && wcscmp(argv[2],L"--set-global-setting")==0;
     if(argc!=2 && !settings && !global_settings && !eq_presets && !applications && !app_profile && !device_settings && !write_setting && !write_global_setting && !select_profile){
         std::fprintf(stderr,"usage: apo_control.exe ORIGINAL_API_DLL [--profile GUID | --global-profile GUID | --application-profile GUID | --settings | --global-settings | --eq-presets | --applications | --application-profile-for APP_GUID PROFILE_GUID | --device-settings GUID | --set-setting NAME VALUE | --set-global-setting NAME VALUE]\n");return 2;
     }
@@ -266,7 +266,12 @@ int wmain(int argc,wchar_t** argv){
             ControlStore* store=nullptr;
             hr=(global_settings || write_global_setting)?control->OpenStore(&store):profile->OpenStore(&store);
             if(!check("OpenSettingsStore",hr))break;
-            valid=(write_setting || write_global_setting)?set_setting(store,argv[3],argv[4]):describe_store(store);
+            if(write_setting || write_global_setting){
+                valid=true;
+                for(int i=3;i+1<argc;i+=2){
+                    if(!set_setting(store,argv[i],argv[i+1])){valid=false;break;}
+                }
+            }else valid=describe_store(store);
             store->Release();break;
         }
         if(select_profile){

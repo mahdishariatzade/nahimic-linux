@@ -56,5 +56,14 @@
   "Maximize": "Развернуть / Восстановить",
   "Close": "Закрыть",
   "The system did not confirm the change. Current state has been reloaded.": "Система не подтвердила изменение. Текущее состояние загружено повторно.",
-  "Waiting for built-in speakers. Other outputs remain available.": "Ожидание встроенных динамиков. Другие выходы доступны."
+  "Waiting for built-in speakers. Other outputs remain available.": "Ожидание встроенных динамиков. Другие выходы доступны.",
+  "Night mode": "Ночной режим",
+  "Softens loud sounds and boosts quiet details.": "Смягчает громкие звуки и усиливает тихие детали.",
+  "Stereo widening": "Расширение стерео",
+  "Expands the soundstage for built-in speakers.": "Расширяет звуковую сцену для встроенных динамиков.",
+  "Volume boost": "Усиление громкости",
+  "EQ Preset": "Пресет эквалайзера",
+  "Custom": "Пользовательский",
+  "Flat": "Плоский",
+  "Reset": "Сброс"
 }

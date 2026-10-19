@@ -21,6 +21,19 @@ ASSETS = Path(__file__).with_name('assets')
 _ASSET_CACHE = {}
 _SCALED_CACHE = {}
 
+EQ_BANDS = (
+    'kSet_EQ31HzGainDB', 'kSet_EQ62HzGainDB', 'kSet_EQ125HzGainDB', 'kSet_EQ250HzGainDB', 'kSet_EQ500HzGainDB',
+    'kSet_EQ1kHzGainDB', 'kSet_EQ2kHzGainDB', 'kSet_EQ4kHzGainDB', 'kSet_EQ8kHzGainDB', 'kSet_EQ16kHzGainDB'
+)
+
+EQ_PRESETS = {
+    'Flat':   (0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+    'Bass':   (6, 5, 4, 2, 1, 0, 0, 0, 0, 0),
+    'Voices': (-2, -1, 0, 2, 4, 4, 3, 1, 0, -1),
+    'Treble': (-1, -1, 0, 0, 1, 2, 3, 5, 6, 6),
+    'Gaming': (4, 3, 1, -1, 0, 2, 3, 4, 3, 2),
+}
+
 def asset(name):
     pixmap = _ASSET_CACHE.get(name)
     if pixmap is None:
@@ -61,7 +74,8 @@ QWidget#titleBar { background: #0c1722; border-bottom: 1px solid #223343; }
 QLabel#windowTitle { color: #9eabb7; font-size: 12px; }
 QToolButton#windowButton, QToolButton#closeWindow { padding: 0; border: none; }
 QToolButton#closeWindow:hover { background: #b63c43; }
-QComboBox { background: #1c3041; border: 1px solid #536879; padding: 8px 12px; min-width: 220px; }
+QComboBox { background: #1c3041; border: 1px solid #536879; padding: 6px 10px; }
+QComboBox#language { min-width: 220px; }
 QComboBox QAbstractItemView { background: #172635; color: #e5eaf0; selection-background-color: #20516a; }
 QLabel#community { color: #8795a2; font-size: 10px; padding: 6px 12px 0 12px; }
 QSlider { background: transparent; }
@@ -122,15 +136,16 @@ class ControlSlider(QSlider):
             self.initStyleOption(opt)
             handle_rect = self.style().subControlRect(
                 QStyle.CC_Slider, opt, QStyle.SC_SliderHandle, self)
-            if not handle_rect.contains(event.pos()):
+            pos = event.position().toPoint() if hasattr(event, 'position') else event.pos()
+            if not handle_rect.contains(pos):
                 if self.orientation() == Qt.Vertical:
                     val = QStyle.sliderValueFromPosition(
                         self.minimum(), self.maximum(),
-                        event.pos().y(), self.height(), True)
+                        pos.y(), self.height(), True)
                 else:
                     val = QStyle.sliderValueFromPosition(
                         self.minimum(), self.maximum(),
-                        event.pos().x(), self.width(), False)
+                        pos.x(), self.width(), False)
                 self.setValue(val)
                 self.sliderReleased.emit()
                 event.accept()
@@ -257,10 +272,23 @@ class Panel(QMainWindow):
         self.mute = Toggle('Mute', mute=True); self.mute.clicked.connect(lambda checked: self.submit(lambda: self.backend.mute(checked), 'state', 'muted', checked))
         volume_layout.addWidget(self.mute, 0, Qt.AlignHCenter)
         self.volume = ControlSlider(Qt.Vertical); self.volume.setRange(0,100); self.volume.setFixedWidth(26); self.volume.setAccessibleName('Speaker volume')
+        self.volume.sliderMoved.connect(lambda v: self.submit(lambda val=v: self.backend.volume(val), 'state', 'volume', v))
         self.volume.sliderReleased.connect(lambda: self.submit(lambda v=self.volume.value(): self.backend.volume(v), 'state', 'volume', self.volume.value()))
         volume_layout.addWidget(self.volume, 1, Qt.AlignHCenter)
         self.volume_value = QLabel('—'); self.volume_value.setObjectName('readout'); self.volume_value.setAlignment(Qt.AlignCenter)
         self.volume.valueChanged.connect(lambda v: self.volume_value.setText(f'{v}%')); volume_layout.addWidget(self.volume_value)
+        self.volume_boost = QCheckBox('+6 dB'); self.volume_boost.setObjectName('caption')
+        self.translations.bind(self.volume_boost, 'toolTip', 'Volume boost')
+        self.volume_boost.setCursor(Qt.PointingHandCursor)
+        self.volume_boost.clicked.connect(lambda checked: (
+            self.update_cached_setting('kSet_VolumeBoostState', int(checked)),
+            self.update_cached_setting('kSet_VolumeBoostGainDB', 6.0 if checked else 0.0),
+            self.submit(lambda: self._apply_setting_writes([
+                ('kSet_VolumeBoostState', int(checked)),
+                ('kSet_VolumeBoostGainDB', 6.0 if checked else 0.0)
+            ]), 'settings', 'kSet_VolumeBoostState', int(checked))
+        ))
+        volume_layout.addWidget(self.volume_boost, 0, Qt.AlignHCenter)
         body.addWidget(device)
         page = QVBoxLayout(); page.setContentsMargins(0,0,0,0); page.setSpacing(0); body.addLayout(page,1)
 
@@ -296,18 +324,38 @@ class Panel(QMainWindow):
         surround = QFrame(); surround.setObjectName('effect'); surround_layout = QHBoxLayout(surround); surround_layout.setContentsMargins(20,8,14,8); surround_layout.setSpacing(12)
         globe = QLabel(); globe.setFixedSize(170,170); globe.setAlignment(Qt.AlignCenter); surround_layout.addWidget(globe)
         self.effect_images['kSet_SpkVirtualSurroundState'] = (globe, 'SoundSurroundOn255x255.png', 'SoundSurroundOff255x255.png')
-        surround_text = QVBoxLayout(); surround_text.setSpacing(18)
+        surround_text = QVBoxLayout(); surround_text.setSpacing(12)
         row=QHBoxLayout(); label=QLabel('Surround sound'); label.setObjectName('effectTitle'); label.setWordWrap(True); row.addWidget(label); row.addStretch()
         switch=self.effect_switch('kSet_SpkVirtualSurroundState','Enable surround sound'); row.addWidget(switch); surround_text.addLayout(row)
         description=QLabel('Hear sound all around you for a more immersive listening experience.'); description.setObjectName('caption'); description.setWordWrap(True)
-        surround_text.addWidget(description); surround_text.addStretch(); surround_layout.addLayout(surround_text,1)
+        surround_text.addWidget(description)
+        self.stereo_widening = QCheckBox('Stereo widening'); self.stereo_widening.setCursor(Qt.PointingHandCursor)
+        self.translations.bind(self.stereo_widening, 'text', 'Stereo widening')
+        self.translations.bind(self.stereo_widening, 'toolTip', 'Expands the soundstage for built-in speakers.')
+        self.stereo_widening.clicked.connect(lambda checked: (
+            self.update_cached_setting('kSet_StereoWideningState', int(checked)),
+            self.submit(lambda: self.backend.set_setting('kSet_StereoWideningState', int(checked)),
+                        'settings', 'kSet_StereoWideningState', int(checked))
+        ))
+        surround_text.addWidget(self.stereo_widening)
+        surround_text.addStretch(); surround_layout.addLayout(surround_text,1)
         upper.addWidget(surround,2)
         compressor=QFrame(); compressor.setObjectName('effect'); compressor_layout=QVBoxLayout(compressor); compressor_layout.setContentsMargins(22,14,14,16); compressor_layout.setSpacing(9)
         row=QHBoxLayout(); label=QLabel('Volume stabilizer'); label.setObjectName('effectTitle'); label.setWordWrap(True); row.addWidget(label); row.addStretch()
         row.addWidget(self.effect_switch('kSet_CompressorState','Enable volume stabilizer')); compressor_layout.addLayout(row)
         wave=QLabel(); wave.setFixedSize(100,75); wave.setAlignment(Qt.AlignCenter); compressor_layout.addWidget(wave,0,Qt.AlignHCenter)
         self.effect_images['kSet_CompressorState']=(wave,'VolumeStabiliserOn80x60.png','VolumeStabilizerOff80x60.png')
-        description=QLabel('Keep volume consistent and reduce sudden changes.'); description.setObjectName('caption'); description.setWordWrap(True); description.setAlignment(Qt.AlignCenter); compressor_layout.addWidget(description); compressor_layout.addStretch()
+        description=QLabel('Keep volume consistent and reduce sudden changes.'); description.setObjectName('caption'); description.setWordWrap(True); description.setAlignment(Qt.AlignCenter); compressor_layout.addWidget(description)
+        self.night_mode = QCheckBox('Night mode'); self.night_mode.setCursor(Qt.PointingHandCursor)
+        self.translations.bind(self.night_mode, 'text', 'Night mode')
+        self.translations.bind(self.night_mode, 'toolTip', 'Softens loud sounds and boosts quiet details.')
+        self.night_mode.clicked.connect(lambda checked: (
+            self.update_cached_setting('kSet_CompressorLevel', int(checked)),
+            self.submit(lambda: self.backend.set_setting('kSet_CompressorLevel', int(checked)),
+                        'settings', 'kSet_CompressorLevel', int(checked))
+        ))
+        compressor_layout.addWidget(self.night_mode, 0, Qt.AlignHCenter)
+        compressor_layout.addStretch()
         upper.addWidget(compressor,1); page.addLayout(upper,1)
 
         lower=QHBoxLayout(); lower.setContentsMargins(0,0,0,0); lower.setSpacing(0)
@@ -331,7 +379,16 @@ class Panel(QMainWindow):
 
         self.equalizer=QDialog(self); self.equalizer.setWindowTitle('Equalizer'); self.equalizer.resize(750,470); self.equalizer.setMinimumSize(660,440)
         eq=QVBoxLayout(); eq.setContentsMargins(24,16,24,24); eq.setSpacing(20)
-        row=QHBoxLayout(); label=QLabel('Equalizer'); label.setObjectName('effectTitle'); label.setWordWrap(True); row.addWidget(label); row.addStretch(); row.addWidget(self.effect_switch('kSet_EQState','Enable equalizer')); eq.addLayout(row)
+        row=QHBoxLayout(); label=QLabel('Equalizer'); label.setObjectName('effectTitle'); label.setWordWrap(True); row.addWidget(label); row.addStretch()
+        self.eq_presets = QComboBox(); self.eq_presets.setAccessibleName('EQ Preset'); self.eq_presets.setFixedWidth(130)
+        for p_name in ('Custom', 'Flat', 'Bass', 'Voices', 'Treble', 'Gaming'):
+            self.eq_presets.addItem(self.translations.text(p_name), p_name)
+        self.eq_presets.activated.connect(self.apply_eq_preset)
+        row.addWidget(self.eq_presets)
+        reset_btn = QPushButton('Reset'); self.translations.bind(reset_btn, 'text', 'Reset'); reset_btn.setCursor(Qt.PointingHandCursor)
+        reset_btn.clicked.connect(lambda: self.apply_eq_preset(self.eq_presets.findData('Flat')))
+        row.addWidget(reset_btn)
+        row.addWidget(self.effect_switch('kSet_EQState','Enable equalizer')); eq.addLayout(row)
         bands=QHBoxLayout(); bands.setSpacing(12)
         scale=QVBoxLayout(); scale.setContentsMargins(0,25,0,25)
         self.scale_high=QLabel('+12'); self.scale_low=QLabel('−12')
@@ -343,7 +400,7 @@ class Panel(QMainWindow):
             name='kSet_EQ'+band+'GainDB'; column=QVBoxLayout(); value=QLabel('0'); value.setObjectName('readout'); value.setAlignment(Qt.AlignCenter); column.addWidget(value)
             slider=ControlSlider(Qt.Vertical); slider.setMinimumHeight(180); slider.setFixedWidth(24); self.translations.bind(slider, 'accessibleName', '{frequency} Hz gain', frequency=label)
             slider.valueChanged.connect(lambda v,l=value:l.setText(f'{v:+d}' if v else '0'))
-            slider.sliderReleased.connect(lambda n=name,s=slider:(self.update_cached_setting(n, s.value()), self.submit(lambda v=s.value():self.backend.set_setting(n,v),'settings',n,s.value())))
+            slider.sliderReleased.connect(lambda n=name,s=slider: self.on_eq_slider_released(n, s.value()))
             self.values[name]=slider; column.addWidget(slider,1,Qt.AlignHCenter)
             frequency=QLabel(label); frequency.setObjectName('caption'); frequency.setAlignment(Qt.AlignCenter); column.addWidget(frequency); bands.addLayout(column,1)
         eq.addLayout(bands,1)
@@ -355,7 +412,7 @@ class Panel(QMainWindow):
         preferences_layout = QVBoxLayout(preferences_body); preferences_layout.setContentsMargins(24,20,24,24); preferences_layout.setSpacing(18)
         language_row = QHBoxLayout(); language_row.setSpacing(18)
         language_label = QLabel('Language'); language_row.addWidget(language_label)
-        self.language = QComboBox(); self.language.setAccessibleName('Language')
+        self.language = QComboBox(); self.language.setObjectName('language'); self.language.setAccessibleName('Language')
         self.language.addItem(self.translations.text('System default'), 'system')
         for code, label in LANGUAGES.items(): self.language.addItem(label, code)
         self.language.setCurrentIndex(self.language.findData(self.translations.choice))
@@ -377,7 +434,7 @@ class Panel(QMainWindow):
         self.translations.capture(self)
         self.controls.setEnabled(False); self.equalizer.setEnabled(False)
         self.timer=QTimer(self);self.timer.timeout.connect(self.poll);self.timer.start(100)
-        self.status_timer=QTimer(self);self.status_timer.timeout.connect(self.refresh);self.status_timer.start(2000)
+        self.status_timer=QTimer(self);self.status_timer.timeout.connect(self.refresh);self.status_timer.start(200)
         self.refresh()
 
     def change_language(self, index):
@@ -388,7 +445,52 @@ class Panel(QMainWindow):
             QMessageBox.warning(self, self.translations.text('Settings'), str(error))
             return
         self.language.setItemText(0, self.translations.text('System default'))
+        for i in range(self.eq_presets.count()):
+            p_data = self.eq_presets.itemData(i)
+            self.eq_presets.setItemText(i, self.translations.text(p_data))
         self.preferences.adjustSize()
+
+    def _apply_setting_writes(self, items):
+        if hasattr(self.backend, 'set_settings'):
+            return self.backend.set_settings(items)
+        res = None
+        for k, v in items:
+            res = self.backend.set_setting(k, v)
+        return res
+
+    def apply_eq_preset(self, index):
+        p_name = self.eq_presets.itemData(index)
+        if p_name not in EQ_PRESETS:
+            return
+        target_vals = EQ_PRESETS[p_name]
+        writes = []
+        for band, val in zip(EQ_BANDS, target_vals):
+            self.update_cached_setting(band, val)
+            slider = self.values.get(band)
+            if slider:
+                slider.setValue(val)
+            writes.append((band, val))
+        self.submit(lambda: self._apply_setting_writes(writes), 'settings', 'eq_preset', p_name)
+
+    def on_eq_slider_released(self, name, value):
+        self.update_cached_setting(name, value)
+        self.update_eq_preset_selection()
+        self.submit(lambda: self.backend.set_setting(name, value), 'settings', name, value)
+
+    def update_eq_preset_selection(self):
+        current_vals = tuple(self.values[band].value() for band in EQ_BANDS if band in self.values)
+        if len(current_vals) != len(EQ_BANDS):
+            return
+        matched = 'Custom'
+        for name, preset_vals in EQ_PRESETS.items():
+            if current_vals == preset_vals:
+                matched = name
+                break
+        idx = self.eq_presets.findData(matched)
+        if idx >= 0 and self.eq_presets.currentIndex() != idx:
+            self.eq_presets.blockSignals(True)
+            self.eq_presets.setCurrentIndex(idx)
+            self.eq_presets.blockSignals(False)
 
     def on_profile_clicked(self, name):
         if name in self.profile_cache:
@@ -408,10 +510,21 @@ class Panel(QMainWindow):
             item = state['settings'].get(name)
             if item:
                 switch.setChecked(bool(item['value']))
+        if 'kSet_VolumeBoostState' in state['settings']:
+            self.volume_boost.setChecked(bool(state['settings']['kSet_VolumeBoostState']['value']))
+        if 'kSet_StereoWideningState' in state['settings']:
+            self.stereo_widening.setChecked(bool(state['settings']['kSet_StereoWideningState']['value']))
+        if 'kSet_CompressorLevel' in state['settings']:
+            self.night_mode.setChecked(bool(state['settings']['kSet_CompressorLevel']['value']))
+        if 'kSet_CompressorState' in state['settings']:
+            self.night_mode.setEnabled(bool(state['settings']['kSet_CompressorState']['value']))
+        if 'kSet_SpkVirtualSurroundState' in state['settings']:
+            self.stereo_widening.setEnabled(bool(state['settings']['kSet_SpkVirtualSurroundState']['value']))
         eq_low = state['settings'].get('kSet_EQ31HzGainDB')
         if eq_low:
             self.scale_high.setText(f"+{round(eq_low['max'])}")
             self.scale_low.setText(str(round(eq_low['min'])))
+        self.update_eq_preset_selection()
         self.update_effect_images()
         self.loaded_profile = state['profile']
 
@@ -425,6 +538,10 @@ class Panel(QMainWindow):
         switch = Toggle(label)
         def on_clicked(checked):
             self.update_cached_setting(name, int(checked))
+            if name == 'kSet_CompressorState':
+                self.night_mode.setEnabled(checked)
+            elif name == 'kSet_SpkVirtualSurroundState':
+                self.stereo_widening.setEnabled(checked)
             self.submit(lambda: self.backend.set_setting(name, int(checked)), 'settings', name, int(checked))
         switch.clicked.connect(on_clicked)
         switch.toggled.connect(self.update_effect_images)
@@ -514,7 +631,8 @@ class Panel(QMainWindow):
         for key, (wanted, deadline) in list(self.awaiting_state.items()):
             if key in queued or deadline is None:
                 continue
-            if key in result and result[key] == wanted:
+            matches = (abs(result[key] - wanted) <= 1) if key == 'volume' and isinstance(result.get(key), (int, float)) and isinstance(wanted, (int, float)) else (result.get(key) == wanted)
+            if key in result and matches:
                 del self.awaiting_state[key]
             elif time.monotonic() >= deadline:
                 del self.awaiting_state[key]
@@ -591,9 +709,22 @@ class Panel(QMainWindow):
             slider.setRange(round(item['min']), round(item['max']))
             slider.setValue(round(item['value']))
         for name, switch in self.switches.items():
-            if name not in protected: switch.setChecked(bool(state['settings'][name]['value']))
-        self.scale_high.setText(f"+{round(state['settings']['kSet_EQ31HzGainDB']['max'])}")
-        self.scale_low.setText(str(round(state['settings']['kSet_EQ31HzGainDB']['min'])))
+            if name not in protected and name in state['settings']:
+                switch.setChecked(bool(state['settings'][name]['value']))
+        if 'kSet_VolumeBoostState' not in protected and 'kSet_VolumeBoostState' in state['settings']:
+            self.volume_boost.setChecked(bool(state['settings']['kSet_VolumeBoostState']['value']))
+        if 'kSet_StereoWideningState' not in protected and 'kSet_StereoWideningState' in state['settings']:
+            self.stereo_widening.setChecked(bool(state['settings']['kSet_StereoWideningState']['value']))
+        if 'kSet_CompressorLevel' not in protected and 'kSet_CompressorLevel' in state['settings']:
+            self.night_mode.setChecked(bool(state['settings']['kSet_CompressorLevel']['value']))
+        if 'kSet_CompressorState' in state['settings']:
+            self.night_mode.setEnabled(bool(state['settings']['kSet_CompressorState']['value']))
+        if 'kSet_SpkVirtualSurroundState' in state['settings']:
+            self.stereo_widening.setEnabled(bool(state['settings']['kSet_SpkVirtualSurroundState']['value']))
+        self.update_eq_preset_selection()
+        if 'kSet_EQ31HzGainDB' in state['settings']:
+            self.scale_high.setText(f"+{round(state['settings']['kSet_EQ31HzGainDB']['max'])}")
+            self.scale_low.setText(str(round(state['settings']['kSet_EQ31HzGainDB']['min'])))
         self.update_effect_images()
         self.loaded_profile = state['profile']
         self.profile_cache[state['profile']] = copy.deepcopy(state)

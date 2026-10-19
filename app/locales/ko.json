@@ -56,5 +56,14 @@
   "Maximize": "최대화 / 복원",
   "Close": "닫기",
   "The system did not confirm the change. Current state has been reloaded.": "시스템에서 변경을 확인하지 못했습니다. 현재 상태를 다시 읽었습니다.",
-  "Waiting for built-in speakers. Other outputs remain available.": "내장 스피커를 기다리는 중입니다. 다른 출력은 사용할 수 있습니다."
+  "Waiting for built-in speakers. Other outputs remain available.": "내장 스피커를 기다리는 중입니다. 다른 출력은 사용할 수 있습니다.",
+  "Night mode": "야간 모드",
+  "Softens loud sounds and boosts quiet details.": "큰 소리를 줄이고 작은 디테일을 강조합니다.",
+  "Stereo widening": "스테레오 확장",
+  "Expands the soundstage for built-in speakers.": "내장 스피커의 사운드스테이지를 확장합니다.",
+  "Volume boost": "볼륨 부스트",
+  "EQ Preset": "EQ 사전 설정",
+  "Custom": "사용자 지정",
+  "Flat": "플랫",
+  "Reset": "재설정"
 }

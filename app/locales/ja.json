@@ -56,5 +56,14 @@
   "Maximize": "最大化 / 元に戻す",
   "Close": "閉じる",
   "The system did not confirm the change. Current state has been reloaded.": "変更をシステムが確認できませんでした。現在の状態を再読み込みしました。",
-  "Waiting for built-in speakers. Other outputs remain available.": "内蔵スピーカーを待っています。他の出力は使用できます。"
+  "Waiting for built-in speakers. Other outputs remain available.": "内蔵スピーカーを待っています。他の出力は使用できます。",
+  "Night mode": "夜間モード",
+  "Softens loud sounds and boosts quiet details.": "大きな音を抑え、小さな音のディテールを強調します。",
+  "Stereo widening": "ステレオ拡張",
+  "Expands the soundstage for built-in speakers.": "内蔵スピーカーの音場を広げます。",
+  "Volume boost": "音量ブースト",
+  "EQ Preset": "EQプリセット",
+  "Custom": "カスタム",
+  "Flat": "フラット",
+  "Reset": "リセット"
 }

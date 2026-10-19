@@ -56,5 +56,14 @@
   "Maximize": "Agrandir / Restaurer",
   "Close": "Fermer",
   "The system did not confirm the change. Current state has been reloaded.": "Le système n’a pas confirmé la modification. L’état actuel a été rechargé.",
-  "Waiting for built-in speakers. Other outputs remain available.": "En attente des haut-parleurs intégrés. Les autres sorties restent disponibles."
+  "Waiting for built-in speakers. Other outputs remain available.": "En attente des haut-parleurs intégrés. Les autres sorties restent disponibles.",
+  "Night mode": "Mode nuit",
+  "Softens loud sounds and boosts quiet details.": "Adoucit les sons forts et amplifie les détails discrets.",
+  "Stereo widening": "Élargissement stéréo",
+  "Expands the soundstage for built-in speakers.": "Élargit la scène sonore pour les haut-parleurs intégrés.",
+  "Volume boost": "Amplification du volume",
+  "EQ Preset": "Préréglage EQ",
+  "Custom": "Personnalisé",
+  "Flat": "Plat",
+  "Reset": "Réinitialiser"
 }

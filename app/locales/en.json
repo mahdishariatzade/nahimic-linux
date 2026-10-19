@@ -56,5 +56,14 @@
   "Maximize": "Maximize / Restore",
   "Close": "Close",
   "The system did not confirm the change. Current state has been reloaded.": "The system did not confirm the change. Current state has been reloaded.",
-  "Waiting for built-in speakers. Other outputs remain available.": "Waiting for built-in speakers. Other outputs remain available."
+  "Waiting for built-in speakers. Other outputs remain available.": "Waiting for built-in speakers. Other outputs remain available.",
+  "Night mode": "Night mode",
+  "Softens loud sounds and boosts quiet details.": "Softens loud sounds and boosts quiet details.",
+  "Stereo widening": "Stereo widening",
+  "Expands the soundstage for built-in speakers.": "Expands the soundstage for built-in speakers.",
+  "Volume boost": "Volume boost",
+  "EQ Preset": "EQ Preset",
+  "Custom": "Custom",
+  "Flat": "Flat",
+  "Reset": "Reset"
 }
