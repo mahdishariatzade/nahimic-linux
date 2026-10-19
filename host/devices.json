@@ -21,7 +21,7 @@
       "codec": "10ec0274",
       "subsystem": "146213c0",
       "device_file": "Devices/146213C0_InternalSpeakers.nsx",
-      "verified": false
+      "verified": true
     }
   ]
 }

@@ -4,7 +4,7 @@ Read README.md first. When the user asks for an installation, check local depend
 
 ## Installation
 
-1. Run `pactl --format=json list sinks` and check `alsa.components` and the speaker port. Supported hardware is listed in `host/devices.json` (verified: `HDA:14f11f87,1d05e022,`; experimental: `HDA:10ec0256,1c05c022,`).
+1. Run `pactl --format=json list sinks` and check `alsa.components` and the speaker port. Supported hardware is listed in `host/devices.json` (verified: `HDA:14f11f87,1d05e022,` and `HDA:10ec0274,146213c0,`; experimental: `HDA:10ec0256,1c05c022,`).
 2. On Arch-based systems, clone this repository and run `makepkg -si` in `packaging/` (see README.md).
 3. WirePlumber 0.5+ is required; keep the system selecting the real output device. Check `nahimic --status` for `ready`, `enabled`, and `active` (true when audio is actually passing through the filter). Open the panel from the system menu and verify the effects switch, volume, and that settings are saved.
 4. Logs: `journalctl --user -u nahimic.service -b`. First initialization is slow; judge readiness from the runtime status.

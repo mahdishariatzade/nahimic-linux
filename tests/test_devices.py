@@ -43,6 +43,7 @@ class DevicesTest(unittest.TestCase):
         entry = devices.match(sink(real), self.table)
         self.assertEqual(entry['codec'], '10ec0274')
         self.assertEqual(entry['device_file'], 'Devices/146213C0_InternalSpeakers.nsx')
+        self.assertTrue(entry['verified'])
         # The HDMI endpoints of the same laptop share the subsystem and must not match.
         self.assertIsNone(devices.match(sink('HDA:10de00a7,146213c0,00100100'), self.table))
         self.assertIsNone(devices.match(sink('HDA:8086281f,80860101,00100000 HDA:10ec0274,146213c0,00100004',
