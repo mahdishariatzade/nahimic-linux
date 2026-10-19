@@ -28,21 +28,7 @@ def wine_tool(name):
     return None
 
 import devices
-from desktop_audio import DesktopAudio, OutputUnavailable, supported_speaker
-
-def linked_channels(listing, sink, target, monitor=None, render=True):
-    """Require both directed stereo connections, including port identities."""
-    edges = set()
-    source = None
-    for line in listing.splitlines():
-        if line and (not line[0].isspace()):
-            source = line.strip()
-        elif source and line.strip().startswith('|-> '):
-            edges.add((source, line.strip()[4:]))
-    expected = {(f'{monitor or sink}:monitor_{ch}', f'{sink}_capture:input_{ch}') for ch in ('FL', 'FR')}
-    if render:
-        expected |= {(f'{sink}_render:output_{ch}', f'{target}:playback_{ch}') for ch in ('FL', 'FR')}
-    return expected <= edges
+from desktop_audio import DesktopAudio, OutputUnavailable, atomic_json, supported_speaker
 
 def clear_stale(sink):
     """Remove leftover render/capture nodes from a previous crashed run.
@@ -70,6 +56,23 @@ def clear_stale(sink):
     return removed
 
 
+def set_pipe_size(stream, target_size=1048576):
+    """Increase Linux IPC pipe buffer size to reduce underrun risk under load."""
+    if stream is None:
+        return
+    try:
+        f_setpipe_sz = getattr(fcntl, 'F_SETPIPE_SZ', 1031)
+        fd = stream.fileno() if hasattr(stream, 'fileno') else stream
+        for size in (target_size, 262144):
+            try:
+                fcntl.fcntl(fd, f_setpipe_sz, size)
+                break
+            except (OSError, PermissionError):
+                continue
+    except Exception:
+        pass
+
+
 def graph_snapshot():
     """Current links and streams, for diagnosing a failed run."""
     parts = []
@@ -81,6 +84,33 @@ def graph_snapshot():
             output = str(error)
         parts.append('$ ' + ' '.join(command) + '\n' + output)
     return '\n'.join(parts)
+
+
+def _edges(listing):
+    """Directed port connections as (source, destination) pairs.
+
+    pw-link prints a connection under both of its nodes, once as "|->" and once
+    as "|<-", so the reverse form is normalised instead of ignored.
+    """
+    pairs = set()
+    source = None
+    for line in listing.splitlines():
+        stripped = line.strip()
+        if line and not line[0].isspace():
+            source = stripped
+        elif source and stripped[:3] in ('|->', '|<-'):
+            other = stripped[4:]
+            pairs.add((source, other) if stripped[2] == '>' else (other, source))
+    return pairs
+
+
+def linked_channels(listing, sink, target, monitor=None, render=True):
+    """Require both directed stereo connections, including port identities."""
+    edges = _edges(listing)
+    expected = {(f'{monitor or sink}:monitor_{ch}', f'{sink}_capture:input_{ch}') for ch in ('FL', 'FR')}
+    if render:
+        expected |= {(f'{sink}_render:output_{ch}', f'{target}:playback_{ch}') for ch in ('FL', 'FR')}
+    return expected <= edges
 
 
 def main():
@@ -213,6 +243,8 @@ def main():
         state['volume_state'] = str(volume_path)
         configuration = ['--use-existing-settings'] if args.reuse_session else ['--settings-root', wine_path(settings), '--device-file', str(device_file).replace('/', '\\'), '--device-id', device, '--profile-id', profile]
         host = start('host', ['wine', str(exe), wine_path(dll), '--wine-setup-compat', '--class', 'CHAIN', *configuration, '--pulse-target', args.target, '--volume-state', wine_path(volume_path), '--stdio'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=0)
+        set_pipe_size(host.stdin)
+        set_pipe_size(host.stdout)
         deadline = time.monotonic() + 45
         while 'stream_ready' not in (work / 'host.log').read_text(errors='replace'):
             if stopping:
