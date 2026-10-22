@@ -66,10 +66,9 @@ class Backend:
         for k, v in items:
             args.extend([str(k), str(v)])
         self.control(*args)
-        if self._cached_settings and "settings" in self._cached_settings:
+        if self._cached_settings and "settings" in self._cached_settings and all(k in self._cached_settings["settings"] for k, _ in items):
             for k, v in items:
-                if k in self._cached_settings["settings"]:
-                    self._cached_settings["settings"][k]["value"] = float(v)
+                self._cached_settings["settings"][k]["value"] = float(v)
             return copy.deepcopy(self._cached_settings)
         return self.settings()
 

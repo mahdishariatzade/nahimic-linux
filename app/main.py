@@ -705,9 +705,10 @@ class Panel(QMainWindow):
             button.setChecked(name == state['profile'])
         for name, slider in self.values.items():
             if name in protected or slider.isSliderDown(): continue
-            item = state['settings'][name]
-            slider.setRange(round(item['min']), round(item['max']))
-            slider.setValue(round(item['value']))
+            if name in state['settings']:
+                item = state['settings'][name]
+                slider.setRange(round(item['min']), round(item['max']))
+                slider.setValue(round(item['value']))
         for name, switch in self.switches.items():
             if name not in protected and name in state['settings']:
                 switch.setChecked(bool(state['settings'][name]['value']))

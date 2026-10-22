@@ -118,4 +118,10 @@ class OptimisticUITest(unittest.TestCase):
         self.assertFalse(p.mute.isChecked());self.assertTrue(p.error_message)
         self.assertNotIn('muted',p.awaiting_state)
 
+    def test_apply_settings_with_missing_keys_does_not_crash(self):
+        p = self.panel
+        # Should not raise KeyError when settings dictionary is incomplete
+        p.apply_settings({'profile': 'Music', 'settings': {}})
+        self.assertTrue(p.settings_loaded)
+
 if __name__ == '__main__': unittest.main()
